@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="36" height="36">
+  <defs>
+    <filter id="stopShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#064e3b" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <g filter="url(#stopShadow)">
+    <path fill="#059669" stroke="#ffffff" stroke-width="2" d="M24 4C15.16 4 8 11.16 8 20c0 10.6 14.2 22.8 14.8 23.3.6.5 1.7.5 2.4 0 .6-.5 14.8-12.7 14.8-23.3 0-8.84-7.16-16-16-16z"/>
+    <!-- Stop Sign / Bus Icon Inside Pin -->
+    <path fill="#ffffff" d="M18 13c0-1.1.9-2 2-2h8c1.1 0 2 .9 2 2v9c0 .6-.4 1-1 1h-.5v1.5c0 .6-.4 1-1 1s-1-.4-1-1V23h-5v1.5c0 .6-.4 1-1 1s-1-.4-1-1V23H19c-.6 0-1-.4-1-1v-9zm2 3h8v-3h-8v3zm1 5c.6 0 1-.4 1-1s-.4-1-1-1-1 .4-1 1 .4 1 1 1zm6 0c.6 0 1-.4 1-1s-.4-1-1-1-1 .4-1 1 .4 1 1 1z"/>
+  </g>
+</svg>
