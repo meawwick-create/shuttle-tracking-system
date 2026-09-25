@@ -20,12 +20,7 @@ export function MapControls({
   onSelectLayer,
   autoCenter,
   onToggleCenter,
-  showStops,
-  onToggleStops,
-  showRoute,
-  onToggleRoute,
-  showTrail,
-  onToggleTrail
+  isOffline = false
 }) {
   return (
     <div className="map-controls-bar">
@@ -48,18 +43,18 @@ export function MapControls({
       {/* Focus Bus Button */}
       <button
         type="button"
-        className={`btn-map-control ${autoCenter ? 'active' : ''}`}
+        className="btn-map-control"
         onClick={onToggleCenter}
-        title="เลื่อนแผนที่ไปยังตำแหน่งรถบัส"
+        title="โฟกัสตำแหน่งรถบัส"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
+          width="15"
+          height="15"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
         >
@@ -70,78 +65,6 @@ export function MapControls({
           <line x1="12" y1="22" x2="12" y2="18"></line>
         </svg>
         <span>โฟกัสรถ</span>
-      </button>
-
-      {/* Toggle Stops Button */}
-      <button
-        type="button"
-        className={`btn-map-control ${showStops ? 'active' : ''}`}
-        onClick={onToggleStops}
-        title="เปิด/ปิด การแสดงป้ายรถรับ-ส่ง"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-          <circle cx="12" cy="10" r="3"></circle>
-        </svg>
-        <span>ป้ายรถ</span>
-      </button>
-
-      {/* Toggle Route Button */}
-      <button
-        type="button"
-        className={`btn-map-control ${showRoute ? 'active' : ''}`}
-        onClick={onToggleRoute}
-        title="เปิด/ปิด การแสดงเส้นทางเดินรถ"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="6" cy="19" r="3"></circle>
-          <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"></path>
-          <circle cx="18" cy="5" r="3"></circle>
-        </svg>
-        <span>เส้นทาง</span>
-      </button>
-
-      {/* Toggle Trail Button */}
-      <button
-        type="button"
-        className={`btn-map-control ${showTrail ? 'active' : ''}`}
-        onClick={onToggleTrail}
-        title="เปิด/ปิด การแสดงประวัติการวิ่ง"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-        </svg>
-        <span>ประวัติวิ่ง</span>
       </button>
     </div>
   );

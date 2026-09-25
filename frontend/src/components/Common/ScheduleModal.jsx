@@ -55,12 +55,6 @@ export function ScheduleModal({ isOpen, onClose }) {
             </div>
           </div>
 
-          <div className="contact-section">
-            <p><strong>ติดต่อสอบถามข้อมูล:</strong> งานบริหารทรัพย์สิน วิทยาเขตสุราษฎร์ธานี</p>
-            <p>📞 โทร 0 7727 8826 (วันเวลาทำการ 08.30 - 16.30 น.)</p>
-            <p>🌐 FB: งานบริหารทรัพย์สิน มหาวิทยาลัยสงขลานครินทร์ วิทยาเขตสุราษฎร์ธานี</p>
-          </div>
-
         </div>
       </div>
     </div>

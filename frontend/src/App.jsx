@@ -62,8 +62,18 @@ export function App() {
 
   // Focus on Bus Marker
   const handleToggleCenter = useCallback(() => {
-    setAutoCenter(true);
+    if (isOffline) {
+      showToast('⚠️ ขณะนี้ไม่มีรถรับ-ส่งให้บริการในระบบ');
+      setFlyToTarget({
+        coords: CONFIG.defaultCenter,
+        zoom: CONFIG.defaultZoom,
+        timestamp: Date.now()
+      });
+      return;
+    }
+
     if (busData?.latitude && busData?.longitude) {
+      setAutoCenter(true);
       setFlyToTarget({
         coords: [busData.latitude, busData.longitude],
         zoom: CONFIG.defaultZoom,
@@ -71,7 +81,7 @@ export function App() {
       });
       showToast('โฟกัสที่ตำแหน่งรถรับ-ส่ง');
     }
-  }, [busData, showToast]);
+  }, [busData, isOffline, showToast]);
 
   const handleDragMap = useCallback(() => {
     setAutoCenter(false);

@@ -5,20 +5,43 @@ import { MapControls } from './MapControls';
 import { MapHudOverlay } from './MapHudOverlay';
 
 /**
- * Creates custom Bus Marker DivIcon with pulse animation
+ * Creates custom 3D Bus Marker DivIcon with smooth directional heading,
+ * 3D isometric vehicle chassis, and floating status tag.
  * @param {boolean} isMoving
+ * @param {boolean} isOffline
+ * @param {number} bearing
+ * @param {number} speed
+ * @param {string} busId
  */
-function createBusIcon(isMoving) {
-  const pulseHtml = isMoving ? '<div class="bus-marker-pulse-ring"></div>' : '';
+function createBusIcon(isMoving, isOffline = false, bearing = 0, speed = 0, busId = 'BUS01') {
+  const offlineTag = isOffline ? '<span class="bus-3d-offline-tag">ออฟไลน์</span>' : '';
+  const roundedBearing = Math.round(bearing || 0);
+  const roundedSpeed = Math.round(speed || 0);
+
   return L.divIcon({
-    className: 'bus-custom-marker',
+    className: 'bus-3d-leaflet-marker',
     html: `
-      ${pulseHtml}
-      <img src="/images/bus-marker.svg" class="bus-marker-img" alt="Shuttle Bus" />
+      <div class="bus-3d-wrapper ${isMoving ? 'is-moving' : 'is-stopped'} ${isOffline ? 'is-offline' : ''}">
+        <!-- 1. Floating 3D HUD Tag (Stays upright regardless of vehicle rotation) -->
+        <div class="bus-3d-floating-tag">
+          <span class="bus-tag-dot ${isOffline ? 'offline' : isMoving ? 'live' : 'idle'}"></span>
+          <span class="bus-tag-name">${busId}</span>
+          ${!isOffline && isMoving && roundedSpeed > 0 ? `<span class="bus-tag-speed">${roundedSpeed} km/h</span>` : ''}
+        </div>
+
+        <!-- 2. Rotating 3D Vehicle Chassis (Smoothly turns to match road heading) -->
+        <div class="bus-3d-rotator" style="transform: rotate(${roundedBearing}deg);">
+          <div class="bus-3d-chassis ${isMoving && !isOffline ? 'bounce-motion' : ''}">
+            <img src="/images/bus-3d.svg" class="bus-3d-img ${isOffline ? 'offline' : ''}" alt="3D Shuttle Bus" />
+          </div>
+        </div>
+
+        ${offlineTag}
+      </div>
     `,
-    iconSize: [48, 48],
-    iconAnchor: [24, 24],
-    popupAnchor: [0, -22]
+    iconSize: [60, 90],
+    iconAnchor: [30, 45],
+    popupAnchor: [0, -48]
   });
 }
 
@@ -51,6 +74,8 @@ export function CampusMap({
   const stopsLayerGroupRef = useRef(null);
   const routePolylineRef = useRef(null);
   const historyTrailRef = useRef(null);
+  const prevLatLngRef = useRef(null);
+  const animFrameRef = useRef(null);
 
   // Keep callback reference updated without triggering re-init
   const onDragMapRef = useRef(onDragMap);
@@ -140,22 +165,51 @@ export function CampusMap({
     const stopsGroup = L.layerGroup().addTo(map);
     stopsLayerGroupRef.current = stopsGroup;
 
-    // Campus Stops Markers
-    const stopIcon = L.icon({
-      iconUrl: '/images/bus-stop.svg',
-      iconSize: [32, 32],
-      iconAnchor: [16, 30],
-      popupAnchor: [0, -28]
-    });
-
+    // Campus Stops Markers (Combined 1: Floating Name Badge + 2: 3D Emerald Pin)
     stops.forEach(stop => {
-      L.marker([stop.lat, stop.lng], { icon: stopIcon })
-        .bindPopup(`
-          <div style="font-family: var(--font-base); font-size: 0.875rem;">
-            <strong style="color: #059669;">🚏 ${stop.name}</strong><br>
-            <span style="color: #64748b; font-size: 0.75rem;">รหัสป้าย: ${stop.id}</span>
+      const stopNum = parseInt(stop.id.replace(/\D/g, ''), 10) || '';
+      const stopCustomIcon = L.divIcon({
+        className: 'custom-stop-div-icon',
+        html: `
+          <div class="stop-marker-combo">
+            <!-- 1. Permanent Floating Name Badge -->
+            <div class="stop-floating-badge">
+              <span class="stop-badge-num">${stopNum}</span>
+              <span class="stop-badge-name">${stop.name}</span>
+            </div>
+
+            <!-- 2. 3D Glassmorphic Emerald Pin -->
+            <div class="stop-pin-3d">
+              <div class="stop-pin-head">
+                <svg viewBox="0 0 24 24" class="stop-pin-svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10z"></path>
+                  <circle cx="7.5" cy="15.5" r="1.5" fill="currentColor"></circle>
+                  <circle cx="16.5" cy="15.5" r="1.5" fill="currentColor"></circle>
+                  <path d="M6 10h12"></path>
+                </svg>
+              </div>
+              <div class="stop-pin-tip"></div>
+              <div class="stop-ground-shadow"></div>
+            </div>
           </div>
-        `)
+        `,
+        iconSize: [180, 80],
+        iconAnchor: [90, 72],
+        popupAnchor: [0, -70]
+      });
+
+      L.marker([stop.lat, stop.lng], { icon: stopCustomIcon })
+        .bindPopup(`
+          <div class="popup-stop-card">
+            <div class="popup-stop-header">
+              <span class="popup-stop-badge">🚏 ป้ายที่ ${stopNum}</span>
+              <h4 class="popup-stop-title">${stop.name}</h4>
+            </div>
+            <div class="popup-stop-footer">
+              <span class="popup-stop-tag">● จุดจอดรับ-ส่งนักศึกษา</span>
+            </div>
+          </div>
+        `, { maxWidth: 260, minWidth: 190 })
         .addTo(stopsGroup);
     });
 
@@ -179,6 +233,9 @@ export function CampusMap({
     });
 
     return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
       map.remove();
       mapInstanceRef.current = null;
       busMarkerRef.current = null;
@@ -245,7 +302,11 @@ export function CampusMap({
     const map = mapInstanceRef.current;
     if (!map || !busData) return;
 
+    // เมื่อรถ Offline ให้ซ่อนหมุดรถออกจากแผนที่
     if (isOffline) {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
       if (busMarkerRef.current && map.hasLayer(busMarkerRef.current)) {
         map.removeLayer(busMarkerRef.current);
       }
@@ -253,13 +314,17 @@ export function CampusMap({
     }
 
     const latLng = [busData.latitude, busData.longitude];
-    const busIcon = createBusIcon(busData.isMoving);
+    const bearing = busData.bearing ?? 0;
+    const speed = busData.speed ?? 0;
+    const busId = busData.busId || 'BUS01';
+    const busIcon = createBusIcon(busData.isMoving, false, bearing, speed, busId);
     const timeOnly = busData.recordedAt ? busData.recordedAt.split(' ')[1] || busData.recordedAt : '-';
 
     const popupHtml = `
       <div class="popup-bus-card">
-        <h4>🚌 ${busData.busName || 'Shuttle'} (${busData.busId || 'BUS01'})</h4>
-        ${(busData.isMoving && !isOffline) ? `<p><strong>ความเร็ว:</strong> ${busData.speed.toFixed(1)} km/h</p>` : ''}
+        <h4>🚌 ${busData.busName || 'Shuttle'} (${busId})</h4>
+        ${busData.isMoving ? `<p><strong>ความเร็ว:</strong> ${speed.toFixed(1)} km/h</p>` : ''}
+        <p><strong>ทิศทางหน้ารถ:</strong> ${Math.round(bearing)}°</p>
         <p><strong>ดาวเทียม:</strong> ${busData.satellites} ดวง</p>
         <p><strong>อัปเดตล่าสุด:</strong> ${timeOnly}</p>
         <div>
@@ -275,14 +340,52 @@ export function CampusMap({
         .addTo(map)
         .bindPopup(popupHtml);
 
+      prevLatLngRef.current = latLng;
       map.setView(latLng, CONFIG.defaultZoom);
     } else {
       if (!map.hasLayer(busMarkerRef.current)) {
         busMarkerRef.current.addTo(map);
       }
       busMarkerRef.current.setIcon(busIcon);
-      busMarkerRef.current.setLatLng(latLng);
       busMarkerRef.current.setPopupContent(popupHtml);
+
+      // Smooth position interpolation across consecutive GPS coordinates
+      const prev = prevLatLngRef.current;
+      if (prev && (prev[0] !== latLng[0] || prev[1] !== latLng[1])) {
+        const startLat = prev[0];
+        const startLng = prev[1];
+        const targetLat = latLng[0];
+        const targetLng = latLng[1];
+        const startTime = performance.now();
+        const duration = 1000; // ms
+
+        if (animFrameRef.current) {
+          cancelAnimationFrame(animFrameRef.current);
+        }
+
+        const animateMarker = (now) => {
+          const elapsed = now - startTime;
+          const progress = Math.min(1, elapsed / duration);
+          // Ease-out cubic
+          const t = 1 - Math.pow(1 - progress, 3);
+          const currentLat = startLat + (targetLat - startLat) * t;
+          const currentLng = startLng + (targetLng - startLng) * t;
+
+          if (busMarkerRef.current) {
+            busMarkerRef.current.setLatLng([currentLat, currentLng]);
+          }
+
+          if (progress < 1) {
+            animFrameRef.current = requestAnimationFrame(animateMarker);
+          }
+        };
+
+        animFrameRef.current = requestAnimationFrame(animateMarker);
+      } else {
+        busMarkerRef.current.setLatLng(latLng);
+      }
+
+      prevLatLngRef.current = latLng;
 
       if (autoCenter) {
         map.panTo(latLng, { animate: true, duration: 1.0 });
@@ -328,12 +431,7 @@ export function CampusMap({
           onSelectLayer={onSelectLayer}
           autoCenter={autoCenter}
           onToggleCenter={onToggleCenter}
-          showStops={showStops}
-          onToggleStops={onToggleStops}
-          showRoute={showRoute}
-          onToggleRoute={onToggleRoute}
-          showTrail={showTrail}
-          onToggleTrail={onToggleTrail}
+          isOffline={isOffline}
         />
       </div>
 

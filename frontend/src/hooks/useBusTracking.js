@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { CONFIG } from '../config/campusConfig';
 import { parseSqlDate } from '../utils/dateUtils';
-import { isValidCoordinate } from '../utils/geoUtils';
+import { isValidCoordinate, calculateBearing, getDistanceFromLatLonInMeters } from '../utils/geoUtils';
 
 /**
  * Custom Hook for real-time bus location polling & tracking state
@@ -14,7 +14,7 @@ import { isValidCoordinate } from '../utils/geoUtils';
 export function useBusTracking(busId = 'BUS01') {
   const [busData, setBusData]       = useState(null);
   const [historyTrail, setHistoryTrail] = useState([]);
-  const [isOffline, setIsOffline]   = useState(false);
+  const [isOffline, setIsOffline]   = useState(true);
   const [statusMessage, setStatusMessage] = useState('กำลังเชื่อมต่อ...');
   const [error, setError]           = useState(null);
 
@@ -75,9 +75,26 @@ export function useBusTracking(busId = 'BUS01') {
         const updatedTime = parseSqlDate(data.updated_at);
         lastUpdatedDateRef.current = updatedTime;
 
+        // Calculate freshness immediately so isOffline is accurate in the very first render cycle
+        const ageSec = updatedTime ? Math.floor((Date.now() - updatedTime.getTime()) / 1000) : Infinity;
+        const offline = isNaN(ageSec) || ageSec > CONFIG.offlineThresholdSec;
+
         if (!isMounted) return;
 
+        setIsOffline(offline);
+        setStatusMessage(offline ? 'Offline' : 'Live Tracking');
+
         setBusData(prev => {
+          let bearing = prev?.bearing ?? 0;
+          if (data.heading !== undefined && !isNaN(parseFloat(data.heading))) {
+            bearing = parseFloat(data.heading);
+          } else if (prev && prev.latitude && prev.longitude) {
+            const dist = getDistanceFromLatLonInMeters(prev.latitude, prev.longitude, lat, lng);
+            if (dist > 1.2) {
+              bearing = Math.round(calculateBearing(prev.latitude, prev.longitude, lat, lng));
+            }
+          }
+
           // Bail out early if nothing actually changed (avoid unnecessary re-renders)
           if (
             prev &&
@@ -86,7 +103,8 @@ export function useBusTracking(busId = 'BUS01') {
             prev.speed      === speed     &&
             prev.satellites === satellites &&
             prev.updatedAt  === data.updated_at &&
-            prev.isMoving   === isMoving
+            prev.isMoving   === isMoving  &&
+            prev.bearing    === bearing
           ) return prev;
 
           return {
@@ -96,6 +114,7 @@ export function useBusTracking(busId = 'BUS01') {
             longitude:  lng,
             speed,
             satellites,
+            bearing,
             updatedAt:   data.updated_at,
             updatedDate: updatedTime,
             // Keep legacy field names so other components don't break

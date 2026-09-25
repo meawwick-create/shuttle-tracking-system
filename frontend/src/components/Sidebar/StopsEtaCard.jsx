@@ -14,7 +14,8 @@ export function StopsEtaCard({
   distanceText,
   etaText,
   stops = [],
-  onSelectStop
+  onSelectStop,
+  isOffline = false
 }) {
   return (
     <div className="info-card stops-card">
@@ -44,15 +45,25 @@ export function StopsEtaCard({
       <div className="eta-highlight">
         <div className="eta-left">
           <span className="eta-title">ป้ายรถถัดไปที่ใกล้ที่สุด</span>
-          <span className="eta-stop-name">
-            {nearestStop ? nearestStop.name : 'กำลังประมวลผล...'}
+          <span className="eta-stop-name" style={{ color: isOffline ? 'var(--text-muted)' : undefined }}>
+            {isOffline
+              ? 'ไม่มีรถให้บริการในขณะนี้'
+              : nearestStop
+              ? nearestStop.name
+              : 'กำลังค้นหาตำแหน่ง...'}
           </span>
           <span className="eta-dist">
-            {nearestStop ? `ระยะทาง ${distanceText}` : '-- เมตร'}
+            {isOffline
+              ? 'รถออฟไลน์'
+              : nearestStop
+              ? `ระยะทาง ${distanceText}`
+              : '-- เมตร'}
           </span>
         </div>
         <div className="eta-badge">
-          <div className="eta-time">{nearestStop ? etaText : '-- นาที'}</div>
+          <div className="eta-time" style={{ color: isOffline ? 'var(--text-muted)' : undefined }}>
+            {isOffline ? '--' : nearestStop ? etaText : '-- นาที'}
+          </div>
         </div>
       </div>
 

@@ -56,13 +56,7 @@ export function Navbar({ isOffline, statusMessage, onOpenSchedule, theme, onTogg
             className="theme-toggle-btn" 
             onClick={onToggleTheme}
             title={theme === 'light' ? 'เปลี่ยนเป็นโหมดมืด' : 'เปลี่ยนเป็นโหมดสว่าง'}
-            style={{ 
-              background: 'transparent', 
-              border: 'none', 
-              fontSize: '1.25rem', 
-              cursor: 'pointer',
-              padding: '0.25rem'
-            }}
+            aria-label="สลับโหมดการแสดงผล"
           >
             {theme === 'light' ? '🌙' : '☀️'}
           </button>

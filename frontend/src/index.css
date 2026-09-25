@@ -131,7 +131,7 @@ body {
   padding: 12px 24px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 16px;
 }
 
@@ -362,29 +362,31 @@ body {
 .btn-map-control {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 6px 12px;
-  font-size: 0.8rem;
-  font-weight: 500;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
   font-family: var(--font-base);
-  background: var(--bg-card-sub);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-light);
+  background: var(--primary-600);
+  color: #ffffff;
+  border: 1px solid var(--primary-600);
   border-radius: 8px;
   cursor: pointer;
-  transition: var(--transition-fast);
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+  transition: all 0.2s ease;
 }
 
 .btn-map-control:hover {
-  background: var(--primary-50);
-  color: var(--primary-600);
-  border-color: var(--primary-500);
+  background: var(--primary-700);
+  border-color: var(--primary-700);
+  color: #ffffff;
+  box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3);
+  transform: translateY(-1px);
 }
 
-.btn-map-control.active {
-  background: var(--primary-600);
-  color: #ffffff;
-  border-color: var(--primary-700);
+.btn-map-control:active {
+  transform: translateY(0);
 }
 
 .btn-map-control svg {
@@ -550,6 +552,12 @@ body {
   background: var(--bg-card-sub);
   color: var(--status-stopped);
   border: 1px solid var(--border-light);
+}
+
+.motion-badge.offline {
+  background: var(--status-offline-bg);
+  color: var(--status-offline);
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .motion-badge svg {
@@ -897,40 +905,299 @@ body {
 /* ==========================================================================
    Leaflet Custom Elements
    ========================================================================== */
-.bus-custom-marker {
+/* 3D Shuttle Bus Marker Styles */
+.bus-3d-leaflet-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.bus-3d-wrapper {
+  position: relative;
+  width: 60px;
+  height: 90px;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
+  pointer-events: auto;
 }
 
-.bus-marker-img {
-  width: 48px;
-  height: 48px;
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+/* 3D Floating HUD Tag (Above Vehicle, Stays Upright) */
+.bus-3d-floating-tag {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(15, 23, 42, 0.88);
+  color: #ffffff;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-family: var(--font-base);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(6px);
+  z-index: 1000;
+  pointer-events: none;
+  transition: all var(--transition-fast);
+}
+
+.bus-tag-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.bus-tag-dot.live {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: tagPulse 1.5s infinite;
+}
+
+.bus-tag-dot.idle {
+  background: #94a3b8;
+}
+
+.bus-tag-dot.offline {
+  background: #ef4444;
+}
+
+@keyframes tagPulse {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.8; }
+}
+
+.bus-tag-name {
+  color: #f8fafc;
+  letter-spacing: 0.5px;
+}
+
+.bus-tag-speed {
+  color: #38bdf8;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding-left: 4px;
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+/* 3D Rotating Chassis (Steers toward actual travel direction) */
+.bus-3d-rotator {
+  width: 60px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: 50% 50%;
+  transition: transform 0.65s cubic-bezier(0.2, 0.85, 0.35, 1.15);
+  will-change: transform;
+}
+
+.bus-3d-chassis {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: 50% 50%;
   transition: transform 0.3s ease;
 }
 
-.bus-marker-pulse-ring {
+/* Dynamic Suspension Vibration when moving */
+.bus-3d-chassis.bounce-motion {
+  animation: busSuspension 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes busSuspension {
+  0% {
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    transform: scale(1.02) translateY(-2px);
+  }
+}
+
+.bus-3d-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 14px rgba(15, 23, 42, 0.45));
+}
+
+.bus-3d-img.offline {
+  filter: grayscale(0.8) opacity(0.8);
+}
+
+.bus-3d-offline-tag {
   position: absolute;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  border: 2px solid #2563eb;
-  background: rgba(37, 99, 235, 0.2);
-  animation: markerPulse 2s infinite ease-out;
+  bottom: -6px;
+  background: var(--status-offline);
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   pointer-events: none;
 }
 
-@keyframes markerPulse {
-  0% {
-    transform: scale(0.85);
-    opacity: 0.9;
-  }
-  100% {
-    transform: scale(1.6);
-    opacity: 0;
-  }
+/* ==========================================================================
+   Custom Bus Stop Marker: Combined Floating Badge + 3D Emerald Pin (Vibrant Green)
+   ========================================================================== */
+.custom-stop-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.stop-marker-combo {
+  position: relative;
+  width: 180px;
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* 1. Permanent Floating Name Badge (Vibrant Emerald & Crisp White) */
+.stop-floating-badge {
+  position: absolute;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  color: #064e3b;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.25), 0 2px 6px rgba(0, 0, 0, 0.08);
+  border: 2px solid #10b981;
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+  max-width: 175px;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 10;
+}
+
+.stop-marker-combo:hover .stop-floating-badge {
+  transform: scale(1.08) translateY(-2px);
+  background: #ecfdf5;
+  border-color: #059669;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.4);
+}
+
+.stop-badge-num {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  font-family: var(--font-base);
+  font-size: 0.72rem;
+  font-weight: 700;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(5, 150, 105, 0.3);
+}
+
+.stop-badge-name {
+  font-family: var(--font-base);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #064e3b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Downward indicator triangle under badge */
+.stop-floating-badge::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #10b981;
+  transition: border-top-color 0.2s ease;
+}
+
+.stop-marker-combo:hover .stop-floating-badge::after {
+  border-top-color: #059669;
+}
+
+/* 2. 3D Glassmorphic Emerald Green Pin */
+.stop-pin-3d {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: auto;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.stop-marker-combo:hover .stop-pin-3d {
+  transform: scale(1.1) translateY(-2px);
+}
+
+.stop-pin-head {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #34d399, #10b981, #047857);
+  border: 2.5px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 
+    0 4px 12px rgba(5, 150, 105, 0.45),
+    inset 0 2px 4px rgba(255, 255, 255, 0.6),
+    inset 0 -2px 4px rgba(4, 120, 87, 0.4);
+  z-index: 2;
+  position: relative;
+}
+
+.stop-pin-svg {
+  width: 16px;
+  height: 16px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+}
+
+.stop-pin-tip {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid #047857;
+  margin-top: -2px;
+  z-index: 1;
+  filter: drop-shadow(0 2px 2px rgba(5, 150, 105, 0.3));
+}
+
+.stop-ground-shadow {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(6, 78, 59, 0.4) 0%, rgba(6, 78, 59, 0) 75%);
+  z-index: 0;
+  pointer-events: none;
 }
 
 .leaflet-popup-content-wrapper {
@@ -973,6 +1240,56 @@ body {
   padding: 2px 8px;
   border-radius: 999px;
   margin-top: 4px;
+}
+
+/* Bus Stop Popup Card Styling (Compact & Clean) */
+.popup-stop-card {
+  font-family: var(--font-base);
+  min-width: 190px;
+  max-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 2px 2px 2px;
+}
+
+.popup-stop-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.popup-stop-badge {
+  align-self: flex-start;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3);
+}
+
+.popup-stop-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--primary-900);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.popup-stop-footer {
+  display: flex;
+  align-items: center;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border-light);
+}
+
+.popup-stop-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #059669;
 }
 
 /* ==========================================================================
@@ -1025,18 +1342,28 @@ body {
   .map-container-box {
     height: 520px;
   }
+
+  .sidebar-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
+  /* iPad / Tablet */
   .navbar-container {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 16px;
   }
 
   .nav-actions {
-    width: 100%;
-    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
   }
+
+
 
   .dashboard-container {
     padding: 0 16px;
@@ -1044,33 +1371,101 @@ body {
   }
 
   .map-container-box {
-    height: 400px;
+    height: 480px;
   }
 
   .map-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 8px;
   }
 
   .map-controls-bar {
     width: 100%;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+    box-sizing: border-box;
+  }
+
+  .map-theme-select-wrapper {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .select-map-layer {
+    width: 100%;
+    height: 40px;
+    box-sizing: border-box;
+    font-size: 0.82rem;
+    padding: 8px 12px;
+    border-radius: 8px;
   }
 
   .btn-map-control {
-    flex: 1;
-    justify-content: center;
+    height: 40px;
+    padding: 0 16px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+    box-sizing: border-box;
+    border-radius: 8px;
   }
 
   .speed-number {
-    font-size: 2.2rem;
+    font-size: 2rem;
   }
 
   .map-hud-overlay {
-    left: 12px;
-    bottom: 12px;
-    padding: 8px 12px;
-    gap: 10px;
+    left: 10px;
+    bottom: 10px;
+    padding: 8px 10px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* Sidebar Panels Stack Vertically (Single Column) on Mobile */
+  .sidebar-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .info-card {
+    padding: 16px;
+    border-radius: 14px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .bus-profile {
+    padding: 12px 14px;
+  }
+
+  .bus-name {
+    font-size: 1.15rem;
+  }
+
+  .eta-highlight {
+    padding: 12px 14px;
+  }
+
+  .stop-item {
+    gap: 8px;
+  }
+
+  .stop-name-group {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .stop-name-group span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: break-word;
   }
 }
 
@@ -1212,43 +1607,166 @@ body {
 }
 
 .contact-section {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  background: var(--primary-50);
+  border: 1px solid var(--border-light);
   padding: 1rem;
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 .contact-section p {
   margin: 0 0 0.5rem 0;
   font-size: 0.9rem;
-  color: #1e3a8a;
+  color: var(--text-primary);
 }
 .contact-section p:last-child {
   margin-bottom: 0;
 }
 
-/* Schedule Button in Navbar */
-.nav-actions {
+/* Contact Card in Sidebar */
+.contact-card .contact-card-body {
   display: flex;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contact-dept-row {
+  display: flex;
   align-items: center;
+  gap: 8px;
+  background: var(--primary-50);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+}
+
+.contact-dept-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--primary-600);
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.contact-dept-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--bg-card-sub);
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+}
+
+.contact-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.contact-item-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.contact-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contact-phone-link {
+  font-weight: 700;
+  color: var(--primary-600);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color var(--transition-fast);
+}
+
+.contact-phone-link:hover {
+  text-decoration: underline;
+  color: var(--primary-700);
+}
+
+.contact-time-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.contact-fb-label {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.contact-fb-link {
+  color: var(--primary-600);
+  text-decoration: none;
+  word-break: break-word;
+  transition: color var(--transition-fast);
+}
+
+.contact-fb-link:hover {
+  text-decoration: underline;
+  color: var(--primary-700);
+}
+
+/* Schedule Button in Navbar */
+
+
+
+
+
+
+/* Navbar Action Items */
+.theme-toggle-btn {
+  background: var(--bg-card-sub);
+  border: 1px solid var(--border-light);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  color: var(--text-primary);
+}
+
+.theme-toggle-btn:hover {
+  background: var(--primary-50);
+  border-color: var(--primary-100);
+  transform: scale(1.05);
 }
 
 .btn-schedule {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   background: var(--primary-600);
   color: white;
   border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-size: 0.875rem;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 0.82rem;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn-schedule:hover {
@@ -1262,19 +1780,98 @@ body {
 }
 
 /* Responsive adjustments */
-@media (max-width: 768px) {
+@media (max-width: 640px) {
+  .navbar-container {
+    padding: 10px 14px;
+    gap: 10px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .brand-section {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .brand-icon {
+    width: 38px;
+    height: 38px;
+    font-size: 18px;
+    border-radius: 10px;
+  }
+
+  .brand-info h1 {
+    font-size: 1rem;
+  }
+
+  .brand-info .sub-text {
+    font-size: 0.75rem;
+  }
+
+  /* Keep all 4 action items on a single neat, non-wrapping row */
+  .nav-actions {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: nowrap !important;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 2px 0;
+  }
+
+  .nav-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .theme-toggle-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  .btn-schedule {
+    padding: 5px 10px;
+    font-size: 0.78rem;
+    gap: 4px;
+    border-radius: 16px;
+    flex-shrink: 0;
+  }
+
+  .btn-schedule svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .live-status-pill {
+    padding: 4px 9px;
+    font-size: 0.78rem;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+
+  .pulse-dot {
+    width: 7px;
+    height: 7px;
+  }
+
+  .clock-display {
+    padding: 4px 8px;
+    font-size: 0.78rem;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .clock-display svg {
+    width: 12px;
+    height: 12px;
+  }
+
   .emergency-grid {
     grid-template-columns: 1fr;
   }
-  .btn-schedule span {
-    display: none;
-  }
-  .btn-schedule {
-    padding: 0.5rem;
-    border-radius: 50%;
-  }
-  .nav-actions {
-    gap: 0.5rem;
-  }
 }
-

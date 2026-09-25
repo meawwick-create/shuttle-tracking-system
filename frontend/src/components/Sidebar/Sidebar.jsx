@@ -2,6 +2,7 @@ import React from 'react';
 import { BusDetailsCard } from './BusDetailsCard';
 import { StopsEtaCard } from './StopsEtaCard';
 import { VehicleSelectorCard } from './VehicleSelectorCard';
+import { ContactCard } from './ContactCard';
 
 /**
  * Sidebar Component aggregating all information cards
@@ -34,12 +35,15 @@ export function Sidebar({
         etaText={etaText}
         stops={stops}
         onSelectStop={onSelectStop}
+        isOffline={isOffline}
       />
 
       <VehicleSelectorCard
         selectedBusId={selectedBusId}
         onSelectBus={onSelectBus}
       />
+
+      <ContactCard />
     </aside>
   );
 }
