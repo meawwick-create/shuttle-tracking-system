@@ -43,23 +43,29 @@ export function useEtaCalculator(busLat, busLng, speed = 0, stops = []) {
     if (!routeStops.length) return EMPTY;
 
     // ── Step 1: detect if bus just entered a stop's radius ──────────────────
-    // We scan ALL stops each cycle; whichever is within threshold AND is the
-    // "natural next" stop (or any stop on a cold start) wins.
-    for (let i = 0; i < routeStops.length; i++) {
-      const s = routeStops[i];
+    // Scan stops in ROUTE ORDER starting from the expected next stop.
+    // This prevents a stop that was already passed (earlier in the array)
+    // from incorrectly firing when the bus is physically between two stops.
+    const n = routeStops.length;
+    const currentNextIdx = lastPassedIndexRef.current === -1
+      ? 0
+      : (lastPassedIndexRef.current + 1) % n;
+
+    for (let offset = 0; offset < n; offset++) {
+      const i    = (currentNextIdx + offset) % n;
+      const s    = routeStops[i];
       const dist = getDistanceFromLatLonInMeters(busLat, busLng, s.lat, s.lng);
+
       if (dist <= STOP_PASS_THRESHOLD_M) {
-        // Only update if this is actually a new stop (not the same one again)
-        // to avoid resetting when the bus is lingering at a stop.
+        // Mark this stop as "last passed" only if it's different from current
         if (i !== lastPassedIndexRef.current) {
           lastPassedIndexRef.current = i;
         }
-        break; // Only one stop can be "active" at a time
+        break; // Only one stop can be active at a time
       }
     }
 
     // ── Step 2: determine nextStop index ────────────────────────────────────
-    const n = routeStops.length;
     let nextIndex;
     if (lastPassedIndexRef.current === -1) {
       // Cold start: find the geographically nearest stop and treat the stop
