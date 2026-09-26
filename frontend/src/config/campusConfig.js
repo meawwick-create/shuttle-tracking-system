@@ -20,6 +20,17 @@ export const CAMPUS_STOPS = [
   { id: 'STOP06', name: 'สำนักงานวิทยาเขตสุราษฎร์ธานี', lat: 9.090905, lng: 99.354390 }
 ];
 
+/**
+ * Circular route order: STOP01 → 02 → 03 → 04 → 05 → 06 → 01 (loop)
+ * The bus always travels in this fixed order.
+ * The ETA engine tracks the last-passed stop index and derives
+ * arrival times for all subsequent stops in sequence.
+ */
+export const ROUTE_ORDER = ['STOP01', 'STOP02', 'STOP03', 'STOP04', 'STOP05', 'STOP06'];
+
+/** Distance threshold (metres) — bus is considered to have "passed" a stop when within this radius. */
+export const STOP_PASS_THRESHOLD_M = 60;
+
 // Available Vehicles (for selector)
 export const VEHICLES = [
   { id: 'BUS01', name: '🚌 BUS01 - Shuttle1 (ใช้งานอยู่)', disabled: false },

@@ -1,22 +1,37 @@
 import React from 'react';
 
 /**
- * Stops and Estimated Time of Arrival (ETA) Card
- * @param {Object} props
- * @param {Object|null} props.nearestStop
- * @param {string} props.distanceText
- * @param {string} props.etaText
- * @param {Array} props.stops
- * @param {Function} props.onSelectStop
+ * Stops and Route-Aware ETA Card
+ *
+ * Displays:
+ *  - The immediate next stop with distance + ETA badge
+ *  - All stops in ROUTE_ORDER with per-stop ETA (cumulative along route)
+ *
+ * Props:
+ *  @param {Object|null}  nextStop      - The next stop the bus will reach
+ *  @param {Object|null}  nearestStop   - Raw nearest stop (for highlight fallback)
+ *  @param {string}       distanceText  - Distance to nextStop
+ *  @param {string}       etaText       - ETA text for nextStop
+ *  @param {Array}        stopsEta      - [{stop, distanceText, etaText, isNext}] ordered by route
+ *  @param {Array}        stops         - Full CAMPUS_STOPS list (for click-to-focus)
+ *  @param {Function}     onSelectStop  - Called when user clicks a stop row
+ *  @param {boolean}      isOffline
  */
 export function StopsEtaCard({
+  nextStop,
   nearestStop,
   distanceText,
   etaText,
+  stopsEta = [],
   stops = [],
   onSelectStop,
   isOffline = false
 }) {
+  // Build a lookup for click-to-focus: stop id → original stop object with lat/lng
+  const stopLookup = Object.fromEntries(stops.map(s => [s.id, s]));
+
+  const highlightId = nextStop?.id ?? nearestStop?.id;
+
   return (
     <div className="info-card stops-card">
       <div className="card-header">
@@ -41,54 +56,86 @@ export function StopsEtaCard({
         </div>
       </div>
 
-      {/* Nearest Stop & ETA Highlight */}
+      {/* ── Next Stop Highlight ── */}
       <div className="eta-highlight">
         <div className="eta-left">
-          <span className="eta-title">ป้ายรถถัดไปที่ใกล้ที่สุด</span>
-          <span className="eta-stop-name" style={{ color: isOffline ? 'var(--text-muted)' : undefined }}>
+          <span className="eta-title">ป้ายถัดไป (ตามเส้นทาง)</span>
+          <span
+            className="eta-stop-name"
+            style={{ color: isOffline ? 'var(--text-muted)' : undefined }}
+          >
             {isOffline
               ? 'ไม่มีรถให้บริการในขณะนี้'
-              : nearestStop
-              ? nearestStop.name
+              : nextStop
+              ? nextStop.name
               : 'กำลังค้นหาตำแหน่ง...'}
           </span>
           <span className="eta-dist">
             {isOffline
               ? 'รถออฟไลน์'
-              : nearestStop
+              : nextStop
               ? `ระยะทาง ${distanceText}`
               : '-- เมตร'}
           </span>
         </div>
         <div className="eta-badge">
-          <div className="eta-time" style={{ color: isOffline ? 'var(--text-muted)' : undefined }}>
-            {isOffline ? '--' : nearestStop ? etaText : '-- นาที'}
+          <div
+            className="eta-time"
+            style={{ color: isOffline ? 'var(--text-muted)' : undefined }}
+          >
+            {isOffline ? '--' : nextStop ? etaText : '-- นาที'}
           </div>
         </div>
       </div>
 
-      {/* Stops List with Click-to-Focus */}
+      {/* ── All Stops in Route Order with ETA ── */}
       <ul className="stops-list" title="คลิกเพื่อเลื่อนแผนที่ไปยังป้ายนั้น">
-        {stops.map((stop, index) => {
-          const isNearest = nearestStop?.id === stop.id;
-          return (
-            <li
-              key={stop.id}
-              className={`stop-item ${isNearest ? 'active' : ''}`}
-              onClick={() => onSelectStop && onSelectStop(stop)}
-            >
-              <div className="stop-name-group">
-                <span className="stop-dot"></span>
-                <span>
-                  {index + 1}. {stop.name}
+        {stopsEta.length > 0
+          ? stopsEta.map(({ stop, etaText: stopEta, distanceText: stopDist, isNext }, index) => {
+              const isHighlighted = stop.id === highlightId;
+              const originalStop  = stopLookup[stop.id] ?? stop;
+              return (
+                <li
+                  key={stop.id}
+                  className={`stop-item ${isHighlighted ? 'active' : ''}`}
+                  onClick={() => onSelectStop && onSelectStop(originalStop)}
+                >
+                  <div className="stop-name-group">
+                    <span className={`stop-dot ${isNext ? 'stop-dot-next' : ''}`} />
+                    <div className="stop-name-col">
+                      <span className="stop-name-text">
+                        {stop.name}
+                      </span>
+                      {!isOffline && (
+                        <span className="stop-eta-sub">
+                          {isNext ? `▶ ถัดไป · ${stopDist}` : stopDist}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className={`stop-eta-badge ${isNext ? 'stop-eta-badge-next' : ''}`}>
+                    {isOffline ? '--' : stopEta}
+                  </span>
+                </li>
+              );
+            })
+          /* Fallback: when offline or ETA not yet computed, show plain list */
+          : stops.map((stop, index) => (
+              <li
+                key={stop.id}
+                className={`stop-item ${stop.id === highlightId ? 'active' : ''}`}
+                onClick={() => onSelectStop && onSelectStop(stop)}
+              >
+                <div className="stop-name-group">
+                  <span className="stop-dot" />
+                  <span>{index + 1}. {stop.name}</span>
+                </div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                  {stop.id}
                 </span>
-              </div>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                {stop.id}
-              </span>
-            </li>
-          );
-        })}
+              </li>
+            ))
+        }
       </ul>
     </div>
   );

@@ -12,8 +12,10 @@ export function Sidebar({
   timeAgo,
   isOffline,
   nearestStop,
+  nextStop,
   distanceText,
   etaText,
+  stopsEta = [],
   stops,
   selectedBusId,
   onSelectBus,
@@ -31,8 +33,10 @@ export function Sidebar({
 
       <StopsEtaCard
         nearestStop={isOffline ? null : nearestStop}
+        nextStop={isOffline ? null : nextStop}
         distanceText={distanceText}
         etaText={etaText}
+        stopsEta={isOffline ? [] : stopsEta}
         stops={stops}
         onSelectStop={onSelectStop}
         isOffline={isOffline}
@@ -47,3 +51,4 @@ export function Sidebar({
     </aside>
   );
 }
+

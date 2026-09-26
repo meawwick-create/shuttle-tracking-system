@@ -1,66 +1,147 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { getDistanceFromLatLonInMeters, isValidCoordinate } from '../utils/geoUtils';
+import { ROUTE_ORDER, STOP_PASS_THRESHOLD_M } from '../config/campusConfig';
 
 /**
- * Custom Hook to calculate the nearest bus stop and Estimated Time of Arrival (ETA)
+ * Route-Aware ETA Calculator for a circular bus route.
+ *
+ * Strategy (user-specified):
+ *   1. Track the last stop the bus "passed" (within STOP_PASS_THRESHOLD_M metres).
+ *   2. The next target stop is always (lastPassedIndex + 1) % routeLength.
+ *   3. Calculate ETA for EVERY subsequent stop by summing straight-line segment
+ *      distances along the route order, divided by effective speed.
+ *
+ * This avoids the bearing ±60° ambiguity when GPS is noisy.
+ *
  * @param {number|null} busLat
  * @param {number|null} busLng
- * @param {number} speed - current speed in km/h
- * @param {Array} stops - array of campus stop objects
+ * @param {number} speed - current GPS speed in km/h
+ * @param {Array}  stops - CAMPUS_STOPS array
+ * @returns {{ nearestStop, nextStop, distanceText, etaText, stopsEta[] }}
  */
 export function useEtaCalculator(busLat, busLng, speed = 0, stops = []) {
+  // Persists across renders — stores the ROUTE_ORDER index of the last passed stop.
+  // -1 means "not yet determined" (first load before bus is near any stop).
+  const lastPassedIndexRef = useRef(-1);
+
   return useMemo(() => {
-    if (!isValidCoordinate(busLat, busLng) || !stops.length) {
-      return {
-        nearestStop: null,
-        distanceText: '-- เมตร',
-        distanceMeters: null,
-        etaMinutes: null,
-        etaText: '-- นาที'
-      };
+    const EMPTY = {
+      nearestStop:   null,
+      nextStop:      null,
+      distanceText:  '-- เมตร',
+      etaText:       '-- นาที',
+      stopsEta:      []
+    };
+
+    if (!isValidCoordinate(busLat, busLng) || !stops.length) return EMPTY;
+
+    // ── Build a stop-id → stop-object lookup ────────────────────────────────
+    const stopMap = Object.fromEntries(stops.map(s => [s.id, s]));
+
+    // Ordered route stops (filter out any IDs missing from stops prop)
+    const routeStops = ROUTE_ORDER.map(id => stopMap[id]).filter(Boolean);
+    if (!routeStops.length) return EMPTY;
+
+    // ── Step 1: detect if bus just entered a stop's radius ──────────────────
+    // We scan ALL stops each cycle; whichever is within threshold AND is the
+    // "natural next" stop (or any stop on a cold start) wins.
+    for (let i = 0; i < routeStops.length; i++) {
+      const s = routeStops[i];
+      const dist = getDistanceFromLatLonInMeters(busLat, busLng, s.lat, s.lng);
+      if (dist <= STOP_PASS_THRESHOLD_M) {
+        // Only update if this is actually a new stop (not the same one again)
+        // to avoid resetting when the bus is lingering at a stop.
+        if (i !== lastPassedIndexRef.current) {
+          lastPassedIndexRef.current = i;
+        }
+        break; // Only one stop can be "active" at a time
+      }
     }
 
-    let minDistanceMeters = Infinity;
-    let nearest = null;
+    // ── Step 2: determine nextStop index ────────────────────────────────────
+    const n = routeStops.length;
+    let nextIndex;
+    if (lastPassedIndexRef.current === -1) {
+      // Cold start: find the geographically nearest stop and treat the stop
+      // AFTER it as our initial next target.
+      let minDist = Infinity;
+      let nearestIdx = 0;
+      routeStops.forEach((s, i) => {
+        const d = getDistanceFromLatLonInMeters(busLat, busLng, s.lat, s.lng);
+        if (d < minDist) { minDist = d; nearestIdx = i; }
+      });
+      // On cold start, assume bus is heading toward the stop AFTER the nearest
+      lastPassedIndexRef.current = nearestIdx;
+      nextIndex = (nearestIdx + 1) % n;
+    } else {
+      nextIndex = (lastPassedIndexRef.current + 1) % n;
+    }
 
-    stops.forEach(stop => {
-      const dist = getDistanceFromLatLonInMeters(busLat, busLng, stop.lat, stop.lng);
-      if (dist < minDistanceMeters) {
-        minDistanceMeters = dist;
-        nearest = stop;
+    const nextStop = routeStops[nextIndex];
+
+    // ── Step 3: effective speed ──────────────────────────────────────────────
+    // If GPS speed < 5 km/h (stopped or unreliable), assume campus cruise = 20 km/h
+    const effectiveSpeedKmh = speed > 5 ? speed : 20;
+    const effectiveSpeedMps = effectiveSpeedKmh * (1000 / 3600);
+
+    // ── Step 4: compute ETA for every stop in route order ───────────────────
+    // Accumulated distance starts as bus → nextStop (straight line proxy)
+    let accumulatedM = getDistanceFromLatLonInMeters(busLat, busLng, nextStop.lat, nextStop.lng);
+
+    const stopsEta = routeStops.map((_, offset) => {
+      const idx  = (nextIndex + offset) % n;
+      const stop = routeStops[idx];
+
+      if (offset > 0) {
+        // Add segment: previous stop → this stop
+        const prevIdx  = (nextIndex + offset - 1) % n;
+        const prevStop = routeStops[prevIdx];
+        accumulatedM  += getDistanceFromLatLonInMeters(
+          prevStop.lat, prevStop.lng,
+          stop.lat,     stop.lng
+        );
       }
+
+      const etaSeconds = accumulatedM / effectiveSpeedMps;
+      const etaMinutes = Math.ceil(etaSeconds / 60);
+      const distRounded = Math.round(accumulatedM);
+      const distText =
+        distRounded >= 1000
+          ? `${(distRounded / 1000).toFixed(2)} กม.`
+          : `${distRounded} เมตร`;
+      const etaText =
+        etaMinutes <= 1 ? 'ถึงแล้ว / ไม่เกิน 1 นาที' : `~ ${etaMinutes} นาที`;
+
+      return {
+        stop,
+        distanceMeters: distRounded,
+        distanceText:   distText,
+        etaMinutes,
+        etaText,
+        isNext:  offset === 0, // The immediate next stop
+      };
     });
 
-    if (!nearest) {
-      return {
-        nearestStop: null,
-        distanceText: '-- เมตร',
-        distanceMeters: null,
-        etaMinutes: null,
-        etaText: '-- นาที'
-      };
-    }
+    // ── Backward-compat: nearestStop (raw closest, regardless of route) ──────
+    let minDistAll = Infinity;
+    let nearest = null;
+    stops.forEach(s => {
+      const d = getDistanceFromLatLonInMeters(busLat, busLng, s.lat, s.lng);
+      if (d < minDistAll) { minDistAll = d; nearest = s; }
+    });
 
-    const distRounded = Math.round(minDistanceMeters);
+    const nextDistM   = stopsEta[0]?.distanceMeters ?? 0;
     const distanceText =
-      distRounded >= 1000
-        ? `${(distRounded / 1000).toFixed(2)} กม.`
-        : `${distRounded} เมตร`;
-
-    // If bus is slow (< 5 km/h) or stopped at a light, assume campus cruising speed = 20 km/h (5.55 m/s)
-    const effectiveSpeedMps = (speed > 5 ? speed : 20) * (1000 / 3600);
-    const etaSeconds = minDistanceMeters / effectiveSpeedMps;
-    const etaMinutes = Math.ceil(etaSeconds / 60);
-
-    const etaText =
-      etaMinutes <= 1 ? 'ถึงแล้ว / ไม่เกิน 1 นาที' : `~ ${etaMinutes} นาที`;
+      nextDistM >= 1000
+        ? `${(nextDistM / 1000).toFixed(2)} กม.`
+        : `${nextDistM} เมตร`;
 
     return {
-      nearestStop: nearest,
+      nearestStop:  nearest,
+      nextStop,
       distanceText,
-      distanceMeters: distRounded,
-      etaMinutes,
-      etaText
+      etaText:      stopsEta[0]?.etaText ?? '-- นาที',
+      stopsEta
     };
   }, [busLat, busLng, speed, stops]);
 }

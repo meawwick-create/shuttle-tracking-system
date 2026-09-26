@@ -216,14 +216,7 @@ export function CampusMap({
     // Route Polyline Loop (Removed per user request)
     // routePolylineRef.current = ...
 
-    // History Trail Polyline
-    historyTrailRef.current = L.polyline([], {
-      color: '#2563eb',
-      weight: 4,
-      opacity: 0.7,
-      dashArray: '6, 8',
-      lineCap: 'round'
-    }).addTo(map);
+    // History Trail Polyline — removed
 
     // User Drag event disables AutoCenter
     map.on('dragstart', () => {
@@ -281,21 +274,10 @@ export function CampusMap({
       }
     }
 
-    if (historyTrailRef.current) {
-      if (showTrail) {
-        if (!map.hasLayer(historyTrailRef.current)) historyTrailRef.current.addTo(map);
-      } else {
-        if (map.hasLayer(historyTrailRef.current)) map.removeLayer(historyTrailRef.current);
-      }
-    }
+
   }, [showStops, showRoute, showTrail]);
 
-  // 4. Update History Trail Coordinates
-  useEffect(() => {
-    if (historyTrailRef.current && historyTrail.length > 0) {
-      historyTrailRef.current.setLatLngs(historyTrail);
-    }
-  }, [historyTrail]);
+
 
   // 5. Update Bus Marker and Auto Center
   useEffect(() => {
