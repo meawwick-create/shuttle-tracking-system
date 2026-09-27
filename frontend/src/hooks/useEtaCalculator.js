@@ -118,7 +118,7 @@ export function useEtaCalculator(busLat, busLng, speed = 0, stops = []) {
     // ── Cumulative ETA for every stop from nextStop outward ──────────────────
     let accumulatedM = distToNextStop;
 
-    const stopsEta = routeStops.map((_, offset) => {
+    const stopsEtaRaw = routeStops.map((_, offset) => {
       const idx  = (nextIndex + offset) % n;
       const stop = routeStops[idx];
 
@@ -147,15 +147,19 @@ export function useEtaCalculator(busLat, busLng, speed = 0, stops = []) {
 
       return {
         stop,
+        routeIndex:     idx,
         distanceMeters: distRounded,
         distanceText:   distText,
         etaMinutes,
         etaText,
-        isNext:       offset === 0,
+        isNext:         offset === 0,
         withinRadius,
         isStopped,
       };
     });
+
+    // Keep stops in fixed canonical ROUTE_ORDER so the list does not jump around
+    const stopsEta = [...stopsEtaRaw].sort((a, b) => a.routeIndex - b.routeIndex);
 
     // ── Nearest stop (raw, backward compat) ──────────────────────────────────
     let minDistAll = Infinity, nearest = null;
@@ -164,7 +168,7 @@ export function useEtaCalculator(busLat, busLng, speed = 0, stops = []) {
       if (d < minDistAll) { minDistAll = d; nearest = s; }
     });
 
-    const nextDistM    = stopsEta[0]?.distanceMeters ?? 0;
+    const nextDistM    = stopsEtaRaw[0]?.distanceMeters ?? 0;
     const distanceText = nextDistM >= 1000
       ? `${(nextDistM / 1000).toFixed(2)} กม.`
       : `${nextDistM} เมตร`;
@@ -173,7 +177,7 @@ export function useEtaCalculator(busLat, busLng, speed = 0, stops = []) {
       nearestStop:  nearest,
       nextStop,
       distanceText,
-      etaText:      stopsEta[0]?.etaText ?? '-- นาที',
+      etaText:      stopsEtaRaw[0]?.etaText ?? '-- นาที',
       stopsEta
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

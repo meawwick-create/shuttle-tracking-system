@@ -56,44 +56,13 @@ export function StopsEtaCard({
         </div>
       </div>
 
-      {/* ── Next Stop Highlight ── */}
-      <div className="eta-highlight">
-        <div className="eta-left">
-          <span className="eta-title">ป้ายถัดไป (ตามเส้นทาง)</span>
-          <span
-            className="eta-stop-name"
-            style={{ color: isOffline ? 'var(--text-muted)' : undefined }}
-          >
-            {isOffline
-              ? 'ไม่มีรถให้บริการในขณะนี้'
-              : nextStop
-              ? nextStop.name
-              : 'กำลังค้นหาตำแหน่ง...'}
-          </span>
-          <span className="eta-dist">
-            {isOffline
-              ? 'รถออฟไลน์'
-              : nextStop
-              ? `ระยะทาง ${distanceText}`
-              : '-- เมตร'}
-          </span>
-        </div>
-        <div className="eta-badge">
-          <div
-            className="eta-time"
-            style={{ color: isOffline ? 'var(--text-muted)' : undefined }}
-          >
-            {isOffline ? '--' : nextStop ? etaText : '-- นาที'}
-          </div>
-        </div>
-      </div>
-
-      {/* ── All Stops in Route Order with ETA ── */}
+      {/* ── All Stops with ETA ── */}
       <ul className="stops-list" title="คลิกเพื่อเลื่อนแผนที่ไปยังป้ายนั้น">
         {stopsEta.length > 0
-          ? stopsEta.map(({ stop, etaText: stopEta, distanceText: stopDist, isNext }, index) => {
+          ? stopsEta.map(({ stop, etaText: stopEta, distanceText: stopDist, isNext, routeIndex }, index) => {
               const isHighlighted = stop.id === highlightId;
               const originalStop  = stopLookup[stop.id] ?? stop;
+              const stopNum       = (routeIndex !== undefined ? routeIndex : index) + 1;
               return (
                 <li
                   key={stop.id}
@@ -101,19 +70,19 @@ export function StopsEtaCard({
                   onClick={() => onSelectStop && onSelectStop(originalStop)}
                 >
                   <div className="stop-name-group">
-                    <span className={`stop-dot ${isNext ? 'stop-dot-next' : ''}`} />
+                    <span className={`stop-dot ${isHighlighted ? 'stop-dot-next' : ''}`} />
                     <div className="stop-name-col">
                       <span className="stop-name-text">
-                        {stop.name}
+                        {stopNum}. {stop.name}
                       </span>
                       {!isOffline && (
                         <span className="stop-eta-sub">
-                          {isNext ? `▶ ถัดไป · ${stopDist}` : stopDist}
+                          {stopDist}
                         </span>
                       )}
                     </div>
                   </div>
-                  <span className={`stop-eta-badge ${isNext ? 'stop-eta-badge-next' : ''}`}>
+                  <span className={`stop-eta-badge ${isHighlighted ? 'stop-eta-badge-next' : ''}`}>
                     {isOffline ? '--' : stopEta}
                   </span>
                 </li>
