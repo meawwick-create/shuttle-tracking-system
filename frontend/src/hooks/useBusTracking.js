@@ -1,158 +1,174 @@
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from '../supabaseClient';
 import { CONFIG } from '../config/campusConfig';
 import { parseSqlDate } from '../utils/dateUtils';
 import { isValidCoordinate, calculateBearing, getDistanceFromLatLonInMeters } from '../utils/geoUtils';
 
 /**
- * Custom Hook for real-time bus location polling & tracking state
+ * Custom Hook for real-time bus location via Supabase Realtime (WebSocket)
+ * Replaces polling with push-based updates — no more setInterval for fetching.
  *
  * API Response Format (current_bus_location):
  *   { bus_id, bus_name, latitude, longitude, speed, satellites, updated_at }
  *
+ * Return interface is identical to the previous polling version:
+ *   { busData, historyTrail, isOffline, statusMessage, error }
+ *
  * @param {string} busId
  */
 export function useBusTracking(busId = 'BUS01') {
-  const [busData, setBusData]       = useState(null);
-  const [historyTrail, setHistoryTrail] = useState([]);
-  const [isOffline, setIsOffline]   = useState(true);
-  const [statusMessage, setStatusMessage] = useState('กำลังเชื่อมต่อ...');
-  const [error, setError]           = useState(null);
+  const [busData,        setBusData]        = useState(null);
+  const [historyTrail,   setHistoryTrail]   = useState([]);
+  const [isOffline,      setIsOffline]      = useState(true);
+  const [statusMessage,  setStatusMessage]  = useState('กำลังเชื่อมต่อ...');
+  const [error,          setError]          = useState(null);
 
-  // Stores the parsed Date of the last successful updated_at from server
+  // Stores the parsed Date of the last received updated_at
   const lastUpdatedDateRef = useRef(null);
 
-  // Guard: prevent overlapping requests if previous fetch hasn't finished
-  const isFetchingRef = useRef(false);
+  // ─── Process raw row from Supabase ─────────────────────────────────────────
+  // Shared by both initial fetch and Realtime payload so logic lives in one place
+  const processRow = (data, setPrev) => {
+    const lat        = parseFloat(data.latitude);
+    const lng        = parseFloat(data.longitude);
+    const speed      = parseFloat(data.speed)        || 0.0;
+    const satellites = parseInt(data.satellites, 10) || 0;
+    const isMoving   = speed > 3.0;
+
+    if (!isValidCoordinate(lat, lng)) return;
+
+    const updatedTime = parseSqlDate(data.updated_at);
+    lastUpdatedDateRef.current = updatedTime;
+
+    const ageSec  = updatedTime
+      ? Math.floor((Date.now() - updatedTime.getTime()) / 1000)
+      : Infinity;
+    const offline = isNaN(ageSec) || ageSec > CONFIG.offlineThresholdSec;
+
+    setIsOffline(offline);
+    setStatusMessage(offline ? 'Offline' : 'Live Tracking');
+    setError(null);
+
+    setBusData(prev => {
+      // ── Bearing calculation ──────────────────────────────────────────────
+      let bearing = prev?.bearing ?? 0;
+      if (data.heading !== undefined && !isNaN(parseFloat(data.heading))) {
+        bearing = parseFloat(data.heading);
+      } else if (prev?.latitude && prev?.longitude) {
+        const dist = getDistanceFromLatLonInMeters(prev.latitude, prev.longitude, lat, lng);
+        if (dist > 1.2) {
+          bearing = Math.round(calculateBearing(prev.latitude, prev.longitude, lat, lng));
+        }
+      }
+
+      // ── Skip re-render when nothing changed ──────────────────────────────
+      if (
+        prev                          &&
+        prev.latitude   === lat       &&
+        prev.longitude  === lng       &&
+        prev.speed      === speed     &&
+        prev.satellites === satellites &&
+        prev.updatedAt  === data.updated_at &&
+        prev.isMoving   === isMoving  &&
+        prev.bearing    === bearing
+      ) return prev;
+
+      return {
+        busId:        data.bus_id   || busId,
+        busName:      data.bus_name || 'Shuttle',
+        latitude:     lat,
+        longitude:    lng,
+        speed,
+        satellites,
+        bearing,
+        updatedAt:    data.updated_at,
+        updatedDate:  updatedTime,
+        // Legacy field aliases — keeps other components from breaking
+        recordedAt:   data.updated_at,
+        recordedDate: updatedTime,
+        isMoving,
+      };
+    });
+
+    // ── History trail (max 100 pts) ──────────────────────────────────────
+    setHistoryTrail(prev => {
+      const last = prev[prev.length - 1];
+      if (!last || last[0] !== lat || last[1] !== lng) {
+        const next = [...prev, [lat, lng]];
+        return next.length > 100 ? next.slice(next.length - 100) : next;
+      }
+      return prev;
+    });
+  };
 
   useEffect(() => {
     let isMounted = true;
-    const controller = new AbortController();
 
-    const fetchBusLocation = async () => {
-      // Skip if previous request is still in flight
-      if (isFetchingRef.current) return;
-      isFetchingRef.current = true;
-
+    // ── 1. Initial fetch (one-shot, before Realtime connects) ─────────────
+    const fetchInitial = async () => {
       try {
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/current_bus_location?bus_id=eq.${busId}&select=*`;
-        const response = await fetch(url, {
-          signal:  controller.signal,
-          cache:   'no-store',
-          headers: { 
-            Accept: 'application/json',
-            apikey: import.meta.env.VITE_SUPABASE_KEY
-          }
-        });
+        const { data: rows, error: fetchError } = await supabase
+          .from('current_bus_location')
+          .select('*')
+          .eq('bus_id', busId)
+          .single();
 
         if (!isMounted) return;
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const dataList = await response.json();
-
-        // Supabase returns an array. If empty, the bus isn't in the DB.
-        if (!dataList || dataList.length === 0) {
-          if (isMounted) {
-            setIsOffline(true);
-            setStatusMessage('ไม่มีข้อมูลในระบบ');
-          }
+        if (fetchError) {
+          console.warn('Initial fetch error:', fetchError.message);
+          setIsOffline(true);
+          setStatusMessage('ไม่พบข้อมูลในระบบ');
           return;
         }
 
-        const data = dataList[0];
-
-        const lat       = parseFloat(data.latitude);
-        const lng       = parseFloat(data.longitude);
-        const speed     = parseFloat(data.speed)     || 0.0;
-        const satellites = parseInt(data.satellites, 10) || 0;
-        const isMoving  = speed > 3.0;
-
-        if (!isValidCoordinate(lat, lng)) return;
-
-        // Use updated_at (new schema) to track data freshness
-        const updatedTime = parseSqlDate(data.updated_at);
-        lastUpdatedDateRef.current = updatedTime;
-
-        // Calculate freshness immediately so isOffline is accurate in the very first render cycle
-        const ageSec = updatedTime ? Math.floor((Date.now() - updatedTime.getTime()) / 1000) : Infinity;
-        const offline = isNaN(ageSec) || ageSec > CONFIG.offlineThresholdSec;
-
-        if (!isMounted) return;
-
-        setIsOffline(offline);
-        setStatusMessage(offline ? 'Offline' : 'Live Tracking');
-
-        setBusData(prev => {
-          let bearing = prev?.bearing ?? 0;
-          if (data.heading !== undefined && !isNaN(parseFloat(data.heading))) {
-            bearing = parseFloat(data.heading);
-          } else if (prev && prev.latitude && prev.longitude) {
-            const dist = getDistanceFromLatLonInMeters(prev.latitude, prev.longitude, lat, lng);
-            if (dist > 1.2) {
-              bearing = Math.round(calculateBearing(prev.latitude, prev.longitude, lat, lng));
-            }
-          }
-
-          // Bail out early if nothing actually changed (avoid unnecessary re-renders)
-          if (
-            prev &&
-            prev.latitude   === lat       &&
-            prev.longitude  === lng       &&
-            prev.speed      === speed     &&
-            prev.satellites === satellites &&
-            prev.updatedAt  === data.updated_at &&
-            prev.isMoving   === isMoving  &&
-            prev.bearing    === bearing
-          ) return prev;
-
-          return {
-            busId:      data.bus_id   || busId,
-            busName:    data.bus_name || 'Shuttle',
-            latitude:   lat,
-            longitude:  lng,
-            speed,
-            satellites,
-            bearing,
-            updatedAt:   data.updated_at,
-            updatedDate: updatedTime,
-            // Keep legacy field names so other components don't break
-            recordedAt:   data.updated_at,
-            recordedDate: updatedTime,
-            isMoving
-          };
-        });
-
-        // History trail — append only when position actually changes (max 100 pts)
-        setHistoryTrail(prev => {
-          const last = prev[prev.length - 1];
-          if (!last || last[0] !== lat || last[1] !== lng) {
-            const next = [...prev, [lat, lng]];
-            return next.length > 100 ? next.slice(next.length - 100) : next;
-          }
-          return prev;
-        });
-
-        setError(null);
+        if (rows) processRow(rows);
 
       } catch (err) {
-        if (err.name !== 'AbortError' && isMounted) {
+        if (isMounted) {
           setError(err.message);
           setIsOffline(true);
           setStatusMessage('การเชื่อมต่อขัดข้อง');
         }
-      } finally {
-        isFetchingRef.current = false;
       }
     };
 
-    // ── Polling ───────────────────────────────────────────────────────────────
-    fetchBusLocation();                                          // immediate
-    const intervalId = setInterval(fetchBusLocation, CONFIG.fetchIntervalMs);
+    fetchInitial();
 
-    // ── Freshness / Offline checker (runs every second) ───────────────────────
-    // Checks updated_at age — catches ESP32 dropout even when server still responds
+    // ── 2. Supabase Realtime subscription ────────────────────────────────
+    const channel = supabase
+      .channel(`bus-tracking-${busId}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  'UPDATE',               // ESP32 ทำ PATCH = UPDATE event
+          schema: 'public',
+          table:  'current_bus_location',
+          filter: `bus_id=eq.${busId}`,   // กรองเฉพาะ BUS01
+        },
+        (payload) => {
+          if (!isMounted) return;
+          console.log('📍 Realtime update:', payload.new);
+          processRow(payload.new);
+        }
+      )
+      .subscribe((status, err) => {
+        if (!isMounted) return;
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Supabase Realtime connected');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Realtime channel error:', err);
+          setStatusMessage('Realtime ขัดข้อง');
+        } else if (status === 'TIMED_OUT') {
+          console.warn('⏱️ Realtime timed out');
+          setStatusMessage('Realtime หมดเวลา');
+        } else if (status === 'CLOSED') {
+          console.warn('🔌 Realtime disconnected');
+        }
+      });
+
+    // ── 3. Freshness / Offline checker (runs every second) ───────────────
+    // Catches ESP32 dropout even when Supabase is still connected
     const freshnessChecker = setInterval(() => {
       if (!isMounted) return;
 
@@ -168,20 +184,18 @@ export function useBusTracking(busId = 'BUS01') {
       const offline = ageSec > CONFIG.offlineThresholdSec;
       const msg     = offline ? 'Offline' : 'Live Tracking';
 
-      setIsOffline(prev     => prev     !== offline ? offline : prev);
-      setStatusMessage(prev => prev     !== msg     ? msg     : prev);
+      setIsOffline(prev => prev !== offline ? offline : prev);
+      setStatusMessage(prev => prev !== msg  ? msg     : prev);
     }, 1000);
 
-    // ── Cleanup ───────────────────────────────────────────────────────────────
+    // ── Cleanup ───────────────────────────────────────────────────────────
     return () => {
       isMounted = false;
-      controller.abort();
-      clearInterval(intervalId);
       clearInterval(freshnessChecker);
+      supabase.removeChannel(channel);
+      console.log('🔌 Realtime unsubscribed');
     };
   }, [busId]);
 
   return { busData, historyTrail, isOffline, statusMessage, error };
 }
-
-
