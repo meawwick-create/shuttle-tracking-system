@@ -73,9 +73,10 @@ export function CampusMap({
   const busMarkerRef = useRef(null);
   const stopsLayerGroupRef = useRef(null);
   const routePolylineRef = useRef(null);
-  const historyTrailRef = useRef(null);
   const prevLatLngRef = useRef(null);
   const animFrameRef = useRef(null);
+  const lastUpdateMsRef = useRef(null);
+  const lastPanTimeRef = useRef(0);
 
   // Keep callback reference updated without triggering re-init
   const onDragMapRef = useRef(onDragMap);
@@ -334,24 +335,32 @@ export function CampusMap({
       // Smooth position interpolation across consecutive GPS coordinates
       const prev = prevLatLngRef.current;
       if (prev && (prev[0] !== latLng[0] || prev[1] !== latLng[1])) {
-        const startLat = prev[0];
-        const startLng = prev[1];
+        // Start from wherever the marker is RIGHT NOW on screen to avoid jumps
+        const currentMarkerPos = busMarkerRef.current.getLatLng();
+        const startLat = currentMarkerPos.lat;
+        const startLng = currentMarkerPos.lng;
         const targetLat = latLng[0];
         const targetLng = latLng[1];
-        const startTime = performance.now();
-        const duration = 1000; // ms
+
+        const now = performance.now();
+        const interval = lastUpdateMsRef.current ? (now - lastUpdateMsRef.current) : 1000;
+        lastUpdateMsRef.current = now;
+
+        // Dynamic duration matching actual packet arrival frequency (bounded 100ms - 1500ms)
+        const duration = Math.min(1500, Math.max(100, interval));
+        const startTime = now;
 
         if (animFrameRef.current) {
           cancelAnimationFrame(animFrameRef.current);
         }
 
-        const animateMarker = (now) => {
-          const elapsed = now - startTime;
+        const animateMarker = (currentTime) => {
+          const elapsed = currentTime - startTime;
           const progress = Math.min(1, elapsed / duration);
-          // Ease-out cubic
-          const t = 1 - Math.pow(1 - progress, 3);
-          const currentLat = startLat + (targetLat - startLat) * t;
-          const currentLng = startLng + (targetLng - startLng) * t;
+
+          // Linear interpolation for constant smooth velocity without stuttering
+          const currentLat = startLat + (targetLat - startLat) * progress;
+          const currentLng = startLng + (targetLng - startLng) * progress;
 
           if (busMarkerRef.current) {
             busMarkerRef.current.setLatLng([currentLat, currentLng]);
@@ -370,7 +379,12 @@ export function CampusMap({
       prevLatLngRef.current = latLng;
 
       if (autoCenter) {
-        map.panTo(latLng, { animate: true, duration: 1.0 });
+        const now = performance.now();
+        // Throttle camera panTo so rapid updates (0.1s - 0.5s) don't thrash Leaflet's camera
+        if (now - lastPanTimeRef.current > 600) {
+          lastPanTimeRef.current = now;
+          map.panTo(latLng, { animate: true, duration: 0.6 });
+        }
       }
     }
   }, [busData, autoCenter, isOffline]);
