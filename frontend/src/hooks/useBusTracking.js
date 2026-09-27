@@ -26,14 +26,16 @@ export function useBusTracking(busId = 'BUS01') {
   // Stores the parsed Date of the last received updated_at
   const lastUpdatedDateRef = useRef(null);
 
+  // Sliding window of recent positions for stationary drift detection: [{ lat, lng, time }]
+  const recentPositionsRef = useRef([]);
+
   // ─── Process raw row from Supabase ─────────────────────────────────────────
   // Shared by both initial fetch and Realtime payload so logic lives in one place
   const processRow = (data, setPrev) => {
     const lat        = parseFloat(data.latitude);
     const lng        = parseFloat(data.longitude);
-    const speed      = parseFloat(data.speed)        || 0.0;
+    const rawSpeed   = parseFloat(data.speed)        || 0.0;
     const satellites = parseInt(data.satellites, 10) || 0;
-    const isMoving   = speed > 3.0;
 
     if (!isValidCoordinate(lat, lng)) return;
 
@@ -49,14 +51,49 @@ export function useBusTracking(busId = 'BUS01') {
     setStatusMessage(offline ? 'Offline' : 'Live Tracking');
     setError(null);
 
+    // ── Indoor GPS Drift / Ghost Speed Filter ─────────────────────────────
+    // When indoors or stationary, multipath reflections cause coordinates to jitter 2-4m/sec,
+    // producing ghost speeds of 10-12 km/h even while sitting on a desk.
+    // We verify against net physical displacement over the last 6 seconds.
+    const now = Date.now();
+    const positions = recentPositionsRef.current;
+    positions.push({ lat, lng, time: now });
+
+    // Keep window within the last 6 seconds
+    while (positions.length > 1 && (now - positions[0].time) > 6000) {
+      positions.shift();
+    }
+
+    let speed = rawSpeed;
+
+    // If we have history over at least 3 seconds, test net displacement
+    if (positions.length >= 2) {
+      const oldest = positions[0];
+      const elapsedSec = (now - oldest.time) / 1000;
+      if (elapsedSec >= 2.5) {
+        const netDistanceM = getDistanceFromLatLonInMeters(oldest.lat, oldest.lng, lat, lng);
+        const netSpeedKmh  = (netDistanceM / elapsedSec) * 3.6;
+
+        // If net physical progress is under 3.5 km/h OR satellites are low (indoor room),
+        // any reported 8-15 km/h is proven to be stationary jitter/drift!
+        if (netSpeedKmh < 3.5 || (satellites > 0 && satellites < 4)) {
+          speed = 0.0;
+        }
+      }
+    } else if (rawSpeed <= 3.0) {
+      speed = 0.0;
+    }
+
+    const isMoving = speed > 3.0;
+
     setBusData(prev => {
       // ── Bearing calculation ──────────────────────────────────────────────
       let bearing = prev?.bearing ?? 0;
       if (data.heading !== undefined && !isNaN(parseFloat(data.heading))) {
         bearing = parseFloat(data.heading);
-      } else if (prev?.latitude && prev?.longitude) {
+      } else if (isMoving && prev?.latitude && prev?.longitude) {
         const dist = getDistanceFromLatLonInMeters(prev.latitude, prev.longitude, lat, lng);
-        if (dist > 1.2) {
+        if (dist > 2.0) {
           bearing = Math.round(calculateBearing(prev.latitude, prev.longitude, lat, lng));
         }
       }
