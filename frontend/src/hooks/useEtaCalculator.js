@@ -1,39 +1,26 @@
 import { useRef, useMemo } from 'react';
 import { getDistanceFromLatLonInMeters, isValidCoordinate } from '../utils/geoUtils';
-import { ROUTE_ORDER, STOP_PASS_THRESHOLD_M } from '../config/campusConfig';
+import { ROUTE_ORDER } from '../config/campusConfig';
 
 /**
- * Route-Aware ETA Calculator — Segment Score Detection
+ * Route-Aware ETA & Stop Arrival Calculator
  *
- * Core idea:
- *   For each pair of consecutive stops (A → B) on the circular route, compute
- *   a "segment score" = dist(bus, A) + dist(bus, B).
- *   The pair with the LOWEST score is the segment the bus is currently on.
- *   lastPassed = A, nextStop = B.
- *
- * Why this is better than radius/threshold checks:
- *   • Works regardless of how close the bus physically gets to a stop coordinate.
- *   • No threshold to tune — self-calibrating for any stop spacing.
- *   • Naturally handles closely-spaced stops (STOP03 ↔ STOP04 at 86 m).
- *   • Robust to GPS noise because the best-scoring segment changes smoothly.
- *
- * Anti-regression rule:
- *   lastPassedIndex can only ADVANCE (or wrap around). It never goes backward.
- *   This prevents GPS jitter from sending the bus "backward" on the route.
- *
- * Cold-start:
- *   First tick skips advancement guard and accepts whatever segment scores best.
- *   Subsequent ticks enforce forward-only movement.
- *
- * "ถึงแล้ว" = bus within STOP_PASS_THRESHOLD_M of the next stop AND stopped.
- * "กำลังถึง..." = within radius but still moving.
+ * Design:
+ *   - Calculates physical distance from the tracking device to each of the 6 campus stops.
+ *   - When the device is within stop radius (160m stationary / 125m moving):
+ *       • The bus is definitively AT that stop (targetIndex = nearestIdx).
+ *       • Status is immediately "ถึงแล้ว / กำลังจอด" (if stopped) or "กำลังถึง..." (if approaching).
+ *       • The stop distance is the true physical distance (e.g. 0-99m), NEVER jumping to 2+ km.
+ *       • Updates lastPassedIndexRef to this stop.
+ *   - When in transit between stops:
+ *       • Advances sequentially along ROUTE_ORDER to (lastPassedIndexRef + 1) % n.
+ *       • Target stop distance counts down as the bus approaches.
+ *       • Failsafe resync ensures that if the device is moved or testing jumps across campus,
+ *         it automatically re-aligns to the bus's true physical position.
  */
-export function useEtaCalculator(busLat, busLng, speed = 0, stops = []) {
-  // Index into ROUTE_ORDER of the stop the bus most recently passed
+export function useEtaCalculator(busLat, busLng, speed = 0, stops = [], isMoving = null) {
+  // Index into ROUTE_ORDER of the stop the bus most recently passed or is currently at
   const lastPassedIndexRef = useRef(-1);
-
-  // True after the first GPS tick has been processed (prevents cold-start jitter)
-  const warmupDoneRef = useRef(false);
 
   return useMemo(() => {
     const EMPTY = {
@@ -53,51 +40,52 @@ export function useEtaCalculator(busLat, busLng, speed = 0, stops = []) {
 
     const n = routeStops.length;
 
-    // ── 1. Find nearest stop to bus ──────────────────────────────────────────
+    // ── 1. Calculate physical distance to each stop ──────────────────────────
+    const dists = routeStops.map(s => getDistanceFromLatLonInMeters(busLat, busLng, s.lat, s.lng));
     let nearestIdx = 0;
     let minDist = Infinity;
-    routeStops.forEach((s, idx) => {
-      const d = getDistanceFromLatLonInMeters(busLat, busLng, s.lat, s.lng);
+    dists.forEach((d, idx) => {
       if (d < minDist) {
         minDist = d;
         nearestIdx = idx;
       }
     });
 
-    const isStopped = speed <= 4.5;
-    const AT_STOP_RADIUS = 90; // 90 metres covers bus stop bays, food courts, and loading zones
-    const isAtStop = minDist <= AT_STOP_RADIUS;
+    // Determine stationary state (supports both isMoving flag and speed threshold)
+    const isStopped = isMoving !== null ? !isMoving : (speed <= 5.0);
 
+    // Stop arrival radius:
+    // 160m when stationary (accommodates indoor GPS drift, rooms like ห้อง 4, bus bays, and food courts)
+    // 125m when moving along the road
+    const stopRadius = isStopped ? 160 : 125;
+    const isAtStop = minDist <= stopRadius;
+
+    // ── 2. Determine target stop (Current or Approaching) ─────────────────────
     let targetIndex;
     if (isAtStop) {
-      // Bus is physically at or arriving at nearestIdx stop
+      // The bus is physically at or arriving at nearestIdx stop
       targetIndex = nearestIdx;
-      lastPassedIndexRef.current = (nearestIdx - 1 + n) % n;
-      warmupDoneRef.current = true;
+      lastPassedIndexRef.current = nearestIdx;
     } else {
-      // Bus is in transit between stops — find segment with minimum normalized excess distance:
-      // excess = (dist(bus, A) + dist(bus, B)) - dist(A, B)
-      // This is scale-independent and does not penalize longer segments.
-      let bestExcess = Infinity;
-      let bestTarget = (lastPassedIndexRef.current + 1 + n) % n;
-
-      for (let offset = 0; offset < n; offset++) {
-        const a = offset;
-        const b = (a + 1) % n;
-        const sA = routeStops[a];
-        const sB = routeStops[b];
-        const dA = getDistanceFromLatLonInMeters(busLat, busLng, sA.lat, sA.lng);
-        const dB = getDistanceFromLatLonInMeters(busLat, busLng, sB.lat, sB.lng);
-        const dAB = getDistanceFromLatLonInMeters(sA.lat, sA.lng, sB.lat, sB.lng);
-        const excess = (dA + dB) - dAB;
-
-        if (excess < bestExcess) {
-          bestExcess = excess;
-          bestTarget = b;
+      // In transit between stops along the circular route
+      if (lastPassedIndexRef.current >= 0) {
+        const expectedTarget = (lastPassedIndexRef.current + 1) % n;
+        // Resync failsafe: if bus was moved or GPS jumped across campus
+        if (dists[expectedTarget] > dists[nearestIdx] + 250) {
+          const nextIdx = (nearestIdx + 1) % n;
+          const prevIdx = (nearestIdx - 1 + n) % n;
+          targetIndex = dists[nextIdx] < dists[prevIdx] ? nextIdx : nearestIdx;
+          lastPassedIndexRef.current = (targetIndex - 1 + n) % n;
+        } else {
+          targetIndex = expectedTarget;
         }
+      } else {
+        // Cold start in transit: determine whether bus is closer to nearestIdx or (nearestIdx + 1) % n
+        const nextIdx = (nearestIdx + 1) % n;
+        const prevIdx = (nearestIdx - 1 + n) % n;
+        targetIndex = dists[nextIdx] < dists[prevIdx] ? nextIdx : nearestIdx;
+        lastPassedIndexRef.current = (targetIndex - 1 + n) % n;
       }
-
-      targetIndex = bestTarget;
     }
 
     const nextStop = routeStops[targetIndex];
@@ -107,10 +95,7 @@ export function useEtaCalculator(busLat, busLng, speed = 0, stops = []) {
     const effectiveSpeedMps = effectiveSpeedKmh / 3.6;
 
     // ── Cumulative ETA starting from targetIndex ─────────────────────────────
-    const distToTarget = isAtStop
-      ? minDist
-      : getDistanceFromLatLonInMeters(busLat, busLng, nextStop.lat, nextStop.lng);
-
+    const distToTarget = isAtStop ? minDist : dists[targetIndex];
     let accumulatedM = distToTarget;
 
     const stopsEtaRaw = [];
@@ -169,6 +154,6 @@ export function useEtaCalculator(busLat, busLng, speed = 0, stops = []) {
       etaText:      nextItem?.etaText ?? '-- นาที',
       stopsEta
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [busLat, busLng, speed, stops]);
+  }, [busLat, busLng, speed, stops, isMoving]);
 }
+

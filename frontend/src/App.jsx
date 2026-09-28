@@ -55,7 +55,8 @@ export function App() {
     busData?.latitude,
     busData?.longitude,
     busData?.speed,
-    CAMPUS_STOPS
+    CAMPUS_STOPS,
+    busData?.isMoving
   );
 
   // 3. User Mobile GPS Location Hook
