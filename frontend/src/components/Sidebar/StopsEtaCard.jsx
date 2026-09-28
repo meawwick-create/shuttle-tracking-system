@@ -148,20 +148,18 @@ export function StopsEtaCard({
 
       {/* ── 2. All Stops List Header ── */}
       <div className="stops-list-section-title">
-        <span>ป้ายทั้งหมดตามเส้นทาง</span>
-        {nearestUserStop && (
-          <span className="sub-hint">เลื่อนดูป้ายอื่น ๆ</span>
-        )}
+        <span>ลำดับป้ายที่จะถึง (เรียงตามตำแหน่งรถ)</span>
+        <span className="sub-hint">ใกล้สุด ➔ ไกลสุด</span>
       </div>
 
       {/* ── 3. All Stops with ETA ── */}
       <ul className="stops-list" title="คลิกเพื่อเลื่อนแผนที่ไปยังป้ายนั้น">
         {stopsEta.length > 0
-          ? stopsEta.map(({ stop, etaText: stopEta, distanceText: stopDist, isNext, routeIndex }, index) => {
+          ? stopsEta.map(({ stop, etaText: stopEta, distanceText: stopDist, isNext }, index) => {
               const isHighlighted = stop.id === highlightId;
               const isUserStop    = stop.id === nearestUserStop?.id;
               const originalStop  = stopLookup[stop.id] ?? stop;
-              const stopNum       = (routeIndex !== undefined ? routeIndex : index) + 1;
+              const stopNum       = parseInt(stop.id.replace(/\D/g, ''), 10) || (index + 1);
               return (
                 <li
                   key={stop.id}
