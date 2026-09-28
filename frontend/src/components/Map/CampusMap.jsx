@@ -46,6 +46,24 @@ function createBusIcon(isMoving, isOffline = false, bearing = 0, speed = 0, busI
 }
 
 /**
+ * Creates custom User Location DivIcon with pulsing wave ring
+ */
+function createUserMarkerIcon() {
+  return L.divIcon({
+    className: 'user-location-div-icon',
+    html: `
+      <div class="user-location-pulse-wrap">
+        <div class="user-pulse-ring"></div>
+        <div class="user-core-dot"></div>
+      </div>
+    `,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14]
+  });
+}
+
+/**
  * Native Leaflet Map Controller Component
  */
 export function CampusMap({
@@ -64,13 +82,17 @@ export function CampusMap({
   showTrail,
   onToggleTrail,
   flyToTarget,
-  isOffline
+  isOffline,
+  userLocation = null,
+  nearestUserStop = null,
+  onLocateUser
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const baseLayersRef = useRef({});
   const currentBaseLayerRef = useRef(null);
   const busMarkerRef = useRef(null);
+  const userMarkerRef = useRef(null);
   const stopsLayerGroupRef = useRef(null);
   const routePolylineRef = useRef(null);
   const prevLatLngRef = useRef(null);
@@ -233,6 +255,7 @@ export function CampusMap({
       map.remove();
       mapInstanceRef.current = null;
       busMarkerRef.current = null;
+      userMarkerRef.current = null;
       stopsLayerGroupRef.current = null;
       routePolylineRef.current = null;
       historyTrailRef.current = null;
@@ -389,7 +412,42 @@ export function CampusMap({
     }
   }, [busData, autoCenter, isOffline]);
 
-  // 6. Handle flyTo target (clicking stop or center button)
+  // 6. Handle User Location Marker on Map
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (!userLocation || !userLocation.lat || !userLocation.lng) {
+      if (userMarkerRef.current && map.hasLayer(userMarkerRef.current)) {
+        map.removeLayer(userMarkerRef.current);
+      }
+      return;
+    }
+
+    const userLatLng = [userLocation.lat, userLocation.lng];
+    const userIcon = createUserMarkerIcon();
+    const popupHtml = `
+      <div class="popup-user-card">
+        <h4>📍 ตำแหน่งของคุณ</h4>
+        ${nearestUserStop ? `<p>ป้ายที่ใกล้ที่สุด: <strong>${nearestUserStop.name}</strong></p>` : ''}
+        <span class="popup-user-tag">● พิกัด GPS มือถือของคุณ</span>
+      </div>
+    `;
+
+    if (!userMarkerRef.current) {
+      userMarkerRef.current = L.marker(userLatLng, { icon: userIcon, zIndexOffset: 700 })
+        .addTo(map)
+        .bindPopup(popupHtml);
+    } else {
+      if (!map.hasLayer(userMarkerRef.current)) {
+        userMarkerRef.current.addTo(map);
+      }
+      userMarkerRef.current.setLatLng(userLatLng);
+      userMarkerRef.current.setPopupContent(popupHtml);
+    }
+  }, [userLocation, nearestUserStop]);
+
+  // 7. Handle flyTo target (clicking stop or center button)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !flyToTarget) return;
@@ -428,6 +486,8 @@ export function CampusMap({
           autoCenter={autoCenter}
           onToggleCenter={onToggleCenter}
           isOffline={isOffline}
+          onLocateUser={onLocateUser}
+          hasUserLocation={!!userLocation}
         />
       </div>
 

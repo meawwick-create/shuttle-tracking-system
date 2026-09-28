@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { CONFIG, CAMPUS_STOPS, MAP_LAYERS } from './config/campusConfig';
 import { useBusTracking } from './hooks/useBusTracking';
 import { useEtaCalculator } from './hooks/useEtaCalculator';
+import { useUserLocation } from './hooks/useUserLocation';
 import { useRelativeTime } from './hooks/useClock';
 import { Navbar } from './components/Navbar/Navbar';
 import { CampusMap } from './components/Map/CampusMap';
@@ -57,8 +58,35 @@ export function App() {
     CAMPUS_STOPS
   );
 
-  // 3. Relative Time Ago
+  // 3. User Mobile GPS Location Hook
+  const {
+    userLocation,
+    isLocating,
+    locationError,
+    requestLocation,
+    nearestUserStop,
+    userDistanceToStop,
+    userDistText
+  } = useUserLocation(CAMPUS_STOPS);
+
+  // 4. Relative Time Ago
   const timeAgo = useRelativeTime(busData?.recordedDate);
+
+  // Locate User on Map
+  const handleLocateUser = useCallback(() => {
+    if (userLocation && userLocation.lat && userLocation.lng) {
+      setAutoCenter(false);
+      setFlyToTarget({
+        coords: [userLocation.lat, userLocation.lng],
+        zoom: 18,
+        timestamp: Date.now()
+      });
+      showToast(nearestUserStop ? `📍 ป้ายของคุณ: ${nearestUserStop.name}` : '📍 ตำแหน่งของคุณ');
+    } else {
+      requestLocation();
+      showToast('📍 กำลังค้นหาตำแหน่ง GPS มือถือของคุณ...');
+    }
+  }, [userLocation, nearestUserStop, requestLocation, showToast]);
 
   // Focus on Bus Marker
   const handleToggleCenter = useCallback(() => {
@@ -177,6 +205,9 @@ export function App() {
           onToggleTrail={handleToggleTrail}
           flyToTarget={flyToTarget}
           isOffline={isOffline}
+          userLocation={userLocation}
+          nearestUserStop={nearestUserStop}
+          onLocateUser={handleLocateUser}
         />
 
         <Sidebar
@@ -193,6 +224,13 @@ export function App() {
           onSelectBus={handleSelectBus}
           onSelectStop={handleSelectStop}
           onCopyCoords={handleCopyCoords}
+          userLocation={userLocation}
+          isLocating={isLocating}
+          locationError={locationError}
+          requestLocation={requestLocation}
+          nearestUserStop={nearestUserStop}
+          userDistanceToStop={userDistanceToStop}
+          userDistText={userDistText}
         />
       </main>
 

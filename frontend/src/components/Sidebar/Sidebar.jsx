@@ -20,7 +20,14 @@ export function Sidebar({
   selectedBusId,
   onSelectBus,
   onSelectStop,
-  onCopyCoords
+  onCopyCoords,
+  userLocation,
+  isLocating,
+  locationError,
+  requestLocation,
+  nearestUserStop,
+  userDistanceToStop,
+  userDistText
 }) {
   return (
     <aside className="sidebar-panel">
@@ -40,6 +47,13 @@ export function Sidebar({
         stops={stops}
         onSelectStop={onSelectStop}
         isOffline={isOffline}
+        userLocation={userLocation}
+        isLocating={isLocating}
+        locationError={locationError}
+        requestLocation={requestLocation}
+        nearestUserStop={nearestUserStop}
+        userDistanceToStop={userDistanceToStop}
+        userDistText={userDistText}
       />
 
       <VehicleSelectorCard

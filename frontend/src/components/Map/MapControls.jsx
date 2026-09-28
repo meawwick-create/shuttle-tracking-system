@@ -20,7 +20,9 @@ export function MapControls({
   onSelectLayer,
   autoCenter,
   onToggleCenter,
-  isOffline = false
+  isOffline = false,
+  onLocateUser,
+  hasUserLocation = false
 }) {
   return (
     <div className="map-controls-bar">
@@ -66,6 +68,31 @@ export function MapControls({
         </svg>
         <span>โฟกัสรถ</span>
       </button>
+
+      {/* Locate User Button */}
+      {onLocateUser && (
+        <button
+          type="button"
+          className={`btn-map-control ${hasUserLocation ? 'active' : ''}`}
+          onClick={onLocateUser}
+          title={hasUserLocation ? 'เลื่อนไปที่ตำแหน่งของคุณ' : 'ค้นหาตำแหน่งของฉัน (GPS มือถือ)'}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polygon points="3 11 22 2 13 21 11 13 3 11" />
+          </svg>
+          <span>ตำแหน่งฉัน</span>
+        </button>
+      )}
     </div>
   );
 }
