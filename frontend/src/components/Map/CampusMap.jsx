@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { CONFIG, CAMPUS_STOPS } from '../../config/campusConfig';
-import { projectCoordinates } from '../../utils/geoUtils';
+import { projectCoordinates, getShortestAngleDelta } from '../../utils/geoUtils';
 import { MapControls } from './MapControls';
 import { MapHudOverlay } from './MapHudOverlay';
 
@@ -27,7 +27,7 @@ function createBusIcon(isMoving, isOffline = false, bearing = 0, speed = 0, busI
         <div class="bus-3d-floating-tag">
           <span class="bus-tag-dot ${isOffline ? 'offline' : isMoving ? 'live' : 'idle'}"></span>
           <span class="bus-tag-name">${busId}</span>
-          ${!isOffline && isMoving && roundedSpeed > 0 ? `<span class="bus-tag-speed">${roundedSpeed} km/h</span>` : ''}
+          ${!isOffline && isMoving && roundedSpeed > 0 ? `<span class="bus-tag-speed">${roundedSpeed} km/h</span>` : `<span class="bus-tag-speed" style="display:none">0 km/h</span>`}
         </div>
 
         <!-- 2. Rotating 3D Vehicle Chassis (Smoothly turns to match road heading) -->
@@ -100,6 +100,9 @@ export function CampusMap({
   const animFrameRef = useRef(null);
   const lastUpdateMsRef = useRef(null);
   const lastPanTimeRef = useRef(0);
+  const currentContinuousBearingRef = useRef(null);
+  const targetContinuousBearingRef = useRef(null);
+  const lastAngularVelocityRef = useRef(0);
 
   // Keep callback reference updated without triggering re-init
   const onDragMapRef = useRef(onDragMap);
@@ -343,6 +346,9 @@ export function CampusMap({
     `;
 
     if (!busMarkerRef.current) {
+      currentContinuousBearingRef.current = bearing;
+      targetContinuousBearingRef.current = bearing;
+
       busMarkerRef.current = L.marker(latLng, { icon: busIcon })
         .addTo(map)
         .bindPopup(popupHtml);
@@ -353,12 +359,69 @@ export function CampusMap({
       if (!map.hasLayer(busMarkerRef.current)) {
         busMarkerRef.current.addTo(map);
       }
-      busMarkerRef.current.setIcon(busIcon);
+
+      // Update DOM contents in-place without calling setIcon (prevents tearing down DOM during turns)
+      const markerEl = busMarkerRef.current.getElement();
+      if (markerEl) {
+        const wrapper = markerEl.querySelector('.bus-3d-wrapper');
+        if (wrapper) {
+          wrapper.className = `bus-3d-wrapper ${busData.isMoving ? 'is-moving' : 'is-stopped'} ${isOffline ? 'is-offline' : ''}`;
+        }
+        const tagDot = markerEl.querySelector('.bus-tag-dot');
+        if (tagDot) {
+          tagDot.className = `bus-tag-dot ${isOffline ? 'offline' : busData.isMoving ? 'live' : 'idle'}`;
+        }
+        const tagName = markerEl.querySelector('.bus-tag-name');
+        if (tagName && tagName.textContent !== busId) {
+          tagName.textContent = busId;
+        }
+        const speedEl = markerEl.querySelector('.bus-tag-speed');
+        const roundedSpeed = Math.round(speed || 0);
+        if (speedEl) {
+          if (!isOffline && busData.isMoving && roundedSpeed > 0) {
+            speedEl.textContent = `${roundedSpeed} km/h`;
+            speedEl.style.display = '';
+          } else {
+            speedEl.style.display = 'none';
+          }
+        }
+        const chassis = markerEl.querySelector('.bus-3d-chassis');
+        if (chassis) {
+          if (busData.isMoving && !isOffline) {
+            chassis.classList.add('bounce-motion');
+          } else {
+            chassis.classList.remove('bounce-motion');
+          }
+        }
+      } else {
+        busMarkerRef.current.setIcon(busIcon);
+      }
+
       busMarkerRef.current.setPopupContent(popupHtml);
 
-      // Smooth position interpolation across consecutive GPS coordinates
+      // Smooth position and rotation interpolation
+      if (currentContinuousBearingRef.current === null) {
+        currentContinuousBearingRef.current = bearing;
+      }
+      const startBearing = currentContinuousBearingRef.current;
+      let angleDelta = getShortestAngleDelta(startBearing, bearing);
+
+      // In a 180° dead U-turn, follow previous angular turn direction (or default clockwise for Thailand LHT)
+      if (Math.abs(angleDelta) === 180) {
+        angleDelta = lastAngularVelocityRef.current < 0 ? -180 : 180;
+      }
+      if (Math.abs(angleDelta) > 0.1) {
+        lastAngularVelocityRef.current = angleDelta;
+      }
+
+      const endBearing = startBearing + angleDelta;
+      targetContinuousBearingRef.current = endBearing;
+
       const prev = prevLatLngRef.current;
-      if (prev && (prev[0] !== latLng[0] || prev[1] !== latLng[1])) {
+      const hasCoordChange = prev && (prev[0] !== latLng[0] || prev[1] !== latLng[1]);
+      const hasBearingChange = Math.abs(angleDelta) > 0.5;
+
+      if (hasCoordChange || hasBearingChange) {
         // Start from wherever the marker is RIGHT NOW on screen to avoid jumps
         const currentMarkerPos = busMarkerRef.current.getLatLng();
         const startLat = currentMarkerPos.lat;
@@ -369,9 +432,6 @@ export function CampusMap({
         let targetLng = latLng[1];
 
         // ── High-Speed Dead Reckoning / Latency Compensation ──
-        // When vehicle moves at 40+ km/h (11.1 m/s), network and sensor transit latency (~350ms)
-        // causes the reported coordinate to be physically 3.5 - 5 meters behind reality.
-        // We project the target forward along bearing to keep marker matched with real vehicle.
         if (isHighSpeed && bearing) {
           const speedMps = speed / 3.6;
           const leadDistanceM = Math.min(15, speedMps * 0.35);
@@ -384,10 +444,10 @@ export function CampusMap({
         const interval = lastUpdateMsRef.current ? (now - lastUpdateMsRef.current) : 1000;
         lastUpdateMsRef.current = now;
 
-        // Dynamic duration: at high speeds, catch up rapidly (150-320ms) instead of lagging for 1000ms
+        // Dynamic duration tailored for smooth motion & turning
         const duration = isHighSpeed
           ? Math.min(320, Math.max(120, interval * 0.35))
-          : Math.min(1200, Math.max(150, interval));
+          : Math.min(1000, Math.max(250, interval));
         const startTime = now;
 
         if (animFrameRef.current) {
@@ -404,16 +464,41 @@ export function CampusMap({
 
           if (busMarkerRef.current) {
             busMarkerRef.current.setLatLng([currentLat, currentLng]);
+
+            // Heading: smooth cubic ease-in-out for realistic vehicle steering rotation
+            const turnEase = progress < 0.5
+              ? 2 * progress * progress
+              : -1 + (4 - 2 * progress) * progress;
+            const currentRot = startBearing + (endBearing - startBearing) * turnEase;
+            currentContinuousBearingRef.current = currentRot;
+
+            const el = busMarkerRef.current.getElement();
+            if (el) {
+              const rotator = el.querySelector('.bus-3d-rotator');
+              if (rotator) {
+                rotator.style.transform = `rotate(${currentRot.toFixed(1)}deg)`;
+              }
+            }
           }
 
           if (progress < 1) {
             animFrameRef.current = requestAnimationFrame(animateMarker);
+          } else {
+            currentContinuousBearingRef.current = endBearing;
           }
         };
 
         animFrameRef.current = requestAnimationFrame(animateMarker);
       } else {
         busMarkerRef.current.setLatLng(latLng);
+        currentContinuousBearingRef.current = endBearing;
+        const el = busMarkerRef.current.getElement();
+        if (el) {
+          const rotator = el.querySelector('.bus-3d-rotator');
+          if (rotator) {
+            rotator.style.transform = `rotate(${endBearing.toFixed(1)}deg)`;
+          }
+        }
       }
 
       prevLatLngRef.current = latLng;

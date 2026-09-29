@@ -1339,7 +1339,6 @@ body {
   align-items: center;
   justify-content: center;
   transform-origin: 50% 50%;
-  transition: transform 0.65s cubic-bezier(0.2, 0.85, 0.35, 1.15);
   will-change: transform;
 }
 

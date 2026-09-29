@@ -27,7 +27,11 @@ export function useBusTracking(busId = 'BUS01') {
   const lastUpdatedDateRef = useRef(null);
 
   // Sliding window of recent positions for stationary drift detection: [{ lat, lng, time }]
-  const recentPositionsRef = useRef([]);
+  // Stores the anchor coordinate used to calculate bearing along curves and U-turns
+  const lastBearingAnchorRef = useRef(null);
+  // Circular history of recent bearings for smoothing micro-jitter during turns
+  const recentBearingsRef = useRef([]);
+  const lastBearingRef = useRef(0);
 
   // ─── Process raw row from Supabase ─────────────────────────────────────────
   // Shared by both initial fetch and Realtime payload so logic lives in one place
@@ -86,17 +90,55 @@ export function useBusTracking(busId = 'BUS01') {
 
     const isMoving = speed > 3.0;
 
-    setBusData(prev => {
-      // ── Bearing calculation ──────────────────────────────────────────────
-      let bearing = prev?.bearing ?? 0;
-      if (data.heading !== undefined && !isNaN(parseFloat(data.heading))) {
-        bearing = parseFloat(data.heading);
-      } else if (isMoving && prev?.latitude && prev?.longitude) {
-        const dist = getDistanceFromLatLonInMeters(prev.latitude, prev.longitude, lat, lng);
-        if (dist > 2.0) {
-          bearing = Math.round(calculateBearing(prev.latitude, prev.longitude, lat, lng));
+    // ── Bearing calculation (Tracks curves and U-turns smoothly) ────────
+    let bearing = lastBearingRef.current;
+    if (data.heading !== undefined && !isNaN(parseFloat(data.heading))) {
+      bearing = parseFloat(data.heading);
+      lastBearingRef.current = bearing;
+    } else if (isMoving) {
+      if (!lastBearingAnchorRef.current) {
+        lastBearingAnchorRef.current = { lat, lng };
+      } else {
+        const distFromAnchor = getDistanceFromLatLonInMeters(
+          lastBearingAnchorRef.current.lat,
+          lastBearingAnchorRef.current.lng,
+          lat,
+          lng
+        );
+        // Update bearing whenever bus moves >= 0.8 meters along the turn
+        if (distFromAnchor >= 0.8) {
+          const rawBearing = calculateBearing(
+            lastBearingAnchorRef.current.lat,
+            lastBearingAnchorRef.current.lng,
+            lat,
+            lng
+          );
+          lastBearingAnchorRef.current = { lat, lng };
+
+          // Circular moving average over 3 samples to filter GPS jitter during turns
+          const history = recentBearingsRef.current;
+          history.push(rawBearing);
+          if (history.length > 3) history.shift();
+
+          let sinSum = 0;
+          let cosSum = 0;
+          for (const b of history) {
+            const rad = (b * Math.PI) / 180;
+            sinSum += Math.sin(rad);
+            cosSum += Math.cos(rad);
+          }
+          const meanRad = Math.atan2(sinSum, cosSum);
+          bearing = Math.round(((meanRad * 180 / Math.PI) + 360) % 360);
+          lastBearingRef.current = bearing;
         }
       }
+    } else {
+      // Stopped: preserve current bearing, reset anchor for fresh start when moving
+      lastBearingAnchorRef.current = null;
+      recentBearingsRef.current = [];
+    }
+
+    setBusData(prev => {
 
       // ── Skip re-render when nothing changed ──────────────────────────────
       if (
