@@ -83,35 +83,79 @@ const BUS_SVG_INLINE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120
 </svg>`;
 
 function createBusIcon(isMoving, isOffline = false, bearing = 0, speed = 0, busId = 'BUS01') {
-  const offlineTag = isOffline ? '<span class="bus-3d-offline-tag">ออฟไลน์</span>' : '';
-  const roundedBearing = Math.round(bearing || 0);
   const roundedSpeed = Math.round(speed || 0);
-  const offlineFilter = isOffline ? 'style="filter: grayscale(0.8) opacity(0.8);"' : '';
+  const statusColor = isOffline ? '#ef4444' : isMoving ? '#10b981' : '#3b82f6';
+  const statusText = isOffline ? 'ออฟไลน์' : isMoving ? `${roundedSpeed} km/h` : 'จอดอยู่';
 
   return L.divIcon({
     className: 'bus-3d-leaflet-marker',
     html: `
-      <div class="bus-3d-wrapper ${isMoving ? 'is-moving' : 'is-stopped'} ${isOffline ? 'is-offline' : ''}">
-        <!-- 1. Floating 3D HUD Tag -->
-        <div class="bus-3d-floating-tag">
-          <span class="bus-tag-dot ${isOffline ? 'offline' : isMoving ? 'live' : 'idle'}"></span>
-          <span class="bus-tag-name">${busId}</span>
-          ${!isOffline && isMoving && roundedSpeed > 0 ? `<span class="bus-tag-speed">${roundedSpeed} km/h</span>` : ''}
+      <div style="
+        position: relative;
+        width: 80px;
+        height: 80px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+      ">
+        <!-- Status Tag -->
+        <div style="
+          position: absolute;
+          top: -8px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: rgba(15, 23, 42, 0.9);
+          color: white;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 600;
+          white-space: nowrap;
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          border: 1px solid rgba(255,255,255,0.3);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        ">
+          <span style="width:7px;height:7px;border-radius:50%;background:${statusColor};display:inline-block;"></span>
+          ${busId}
         </div>
 
-        <!-- 2. Rotating 3D Vehicle Chassis -->
-        <div class="bus-3d-rotator" style="transform: rotate(${roundedBearing}deg);">
-          <div class="bus-3d-chassis ${isMoving && !isOffline ? 'bounce-motion' : ''}">
-            <div class="bus-3d-img" ${offlineFilter}>${BUS_SVG_INLINE}</div>
-          </div>
-        </div>
+        <!-- Big Bus Circle -->
+        <div style="
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #2563eb, #1d4ed8);
+          border: 3px solid #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 24px;
+          box-shadow: 0 4px 15px rgba(37, 99, 235, 0.5), 0 0 0 4px rgba(37, 99, 235, 0.2);
+          ${isOffline ? 'filter: grayscale(0.7); opacity: 0.7;' : ''}
+        ">🚌</div>
 
-        ${offlineTag}
+        <!-- Speed/Status Label -->
+        <div style="
+          margin-top: 2px;
+          background: ${statusColor};
+          color: white;
+          padding: 1px 6px;
+          border-radius: 8px;
+          font-size: 10px;
+          font-weight: 700;
+          white-space: nowrap;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        ">${statusText}</div>
       </div>
     `,
-    iconSize: [60, 90],
-    iconAnchor: [30, 45],
-    popupAnchor: [0, -48]
+    iconSize: [80, 80],
+    iconAnchor: [40, 40],
+    popupAnchor: [0, -45]
   });
 }
 
