@@ -388,19 +388,13 @@ export function CampusMap({
 
     console.log('[CampusMap] busData update:', busData.latitude, busData.longitude, 'offline:', isOffline);
 
-    // เมื่อรถ Offline ให้แสดง marker แบบ offline style (ไม่ลบออก)
+    // เมื่อรถ Offline ไม่ให้แสดงตำแหน่งรถบนแผนที่ (นำ marker ออกจากแผนที่)
     if (isOffline) {
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
       }
-      const latLng = [busData.latitude, busData.longitude];
-      const offlineIcon = createBusIcon(false, true, busData.bearing ?? 0, 0, busData.busId || 'BUS01');
-      if (!busMarkerRef.current) {
-        busMarkerRef.current = L.marker(latLng, { icon: offlineIcon }).addTo(map);
-      } else {
-        if (!map.hasLayer(busMarkerRef.current)) busMarkerRef.current.addTo(map);
-        busMarkerRef.current.setIcon(offlineIcon);
-        busMarkerRef.current.setLatLng(latLng);
+      if (busMarkerRef.current && map.hasLayer(busMarkerRef.current)) {
+        map.removeLayer(busMarkerRef.current);
       }
       return;
     }
