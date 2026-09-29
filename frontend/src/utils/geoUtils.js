@@ -65,3 +65,35 @@ export function isValidCoordinate(lat, lng) {
     lng <= 180
   );
 }
+
+/**
+ * Projects a GPS coordinate forward by a given distance (meters) along a bearing (degrees).
+ * Used for dead-reckoning and network latency compensation at high vehicle speeds (>25 km/h).
+ * @param {number} lat
+ * @param {number} lon
+ * @param {number} bearingDeg
+ * @param {number} distanceM
+ * @returns {[number, number]} [projectedLat, projectedLng]
+ */
+export function projectCoordinates(lat, lon, bearingDeg, distanceM) {
+  if (!distanceM || distanceM <= 0) return [lat, lon];
+  const R = 6371e3;
+  const dByR = distanceM / R;
+  const rad = deg => (deg * Math.PI) / 180;
+  const deg = r => (r * 180) / Math.PI;
+
+  const lat1 = rad(lat);
+  const lon1 = rad(lon);
+  const brng = rad(bearingDeg);
+
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(dByR) +
+    Math.cos(lat1) * Math.sin(dByR) * Math.cos(brng)
+  );
+  const lon2 = lon1 + Math.atan2(
+    Math.sin(brng) * Math.sin(dByR) * Math.cos(lat1),
+    Math.cos(dByR) - Math.sin(lat1) * Math.sin(lat2)
+  );
+
+  return [deg(lat2), deg(lon2)];
+}
