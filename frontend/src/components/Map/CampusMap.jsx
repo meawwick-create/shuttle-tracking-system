@@ -259,7 +259,6 @@ export function CampusMap({
       userMarkerRef.current = null;
       stopsLayerGroupRef.current = null;
       routePolylineRef.current = null;
-      historyTrailRef.current = null;
     };
   }, []); // Run ONLY once on mount!
 
