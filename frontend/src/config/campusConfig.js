@@ -5,7 +5,7 @@
 
 export const CONFIG = {
   fetchIntervalMs: 500,        // Polling every 500 ms (matches ESP32 send rate)
-  offlineThresholdSec: 30,     // Offline if no update for > 30 seconds
+  offlineThresholdSec: 8,      // Offline if no update for > 8 seconds
   defaultZoom: 17,
   defaultCenter: [9.0954688, 99.3576160], // Default university center coordinates
 };
