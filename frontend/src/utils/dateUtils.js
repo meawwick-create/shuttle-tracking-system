@@ -9,7 +9,15 @@
  */
 export function parseSqlDate(sqlDateStr) {
   if (!sqlDateStr) return null;
-  const isoStr = sqlDateStr.replace(' ', 'T');
+  // Replace space with T for ISO format
+  let isoStr = sqlDateStr.replace(' ', 'T');
+  // Supabase stores timestamps in UTC. If no timezone suffix is present,
+  // append 'Z' so the browser parses it as UTC instead of local time.
+  // Without this, UTC "10:00:00" is treated as local "10:00:00" (UTC+7),
+  // causing a 7-hour offset that prevents offline detection from working.
+  if (!isoStr.endsWith('Z') && !isoStr.includes('+') && !/[0-9]-[0-9]{2}:[0-9]{2}$/.test(isoStr)) {
+    isoStr += 'Z';
+  }
   const d = new Date(isoStr);
   return isNaN(d.getTime()) ? null : d;
 }
