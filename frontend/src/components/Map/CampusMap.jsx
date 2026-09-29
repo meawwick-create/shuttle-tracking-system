@@ -307,15 +307,29 @@ export function CampusMap({
   // 5. Update Bus Marker and Auto Center
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map || !busData) return;
+    if (!map) return;
 
-    // เมื่อรถ Offline ให้ซ่อนหมุดรถออกจากแผนที่
+    // ถ้าไม่มี busData เลย ไม่ต้องทำอะไร
+    if (!busData) {
+      console.log('[CampusMap] busData is null — marker not yet created');
+      return;
+    }
+
+    console.log('[CampusMap] busData update:', busData.latitude, busData.longitude, 'offline:', isOffline);
+
+    // เมื่อรถ Offline ให้แสดง marker แบบ offline style (ไม่ลบออก)
     if (isOffline) {
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
       }
-      if (busMarkerRef.current && map.hasLayer(busMarkerRef.current)) {
-        map.removeLayer(busMarkerRef.current);
+      const latLng = [busData.latitude, busData.longitude];
+      const offlineIcon = createBusIcon(false, true, busData.bearing ?? 0, 0, busData.busId || 'BUS01');
+      if (!busMarkerRef.current) {
+        busMarkerRef.current = L.marker(latLng, { icon: offlineIcon }).addTo(map);
+      } else {
+        if (!map.hasLayer(busMarkerRef.current)) busMarkerRef.current.addTo(map);
+        busMarkerRef.current.setIcon(offlineIcon);
+        busMarkerRef.current.setLatLng(latLng);
       }
       return;
     }
