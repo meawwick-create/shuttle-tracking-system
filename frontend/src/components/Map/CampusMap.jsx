@@ -5,6 +5,80 @@ import { projectCoordinates, getShortestAngleDelta } from '../../utils/geoUtils'
 import { MapControls } from './MapControls';
 import { MapHudOverlay } from './MapHudOverlay';
 
+const BUS_3D_SVG_INLINE = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 180" width="60" height="90" class="bus-3d-img">
+  <defs>
+    <filter id="bus3dShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+      <feOffset dx="0" dy="8" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.35"/>
+      </feComponentTransfer>
+      <feMerge> 
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="headlightGrad" x1="50%" y1="100%" x2="50%" y2="0%">
+      <stop offset="0%" stop-color="#fef08a" stop-opacity="0.6"/>
+      <stop offset="60%" stop-color="#fef9c3" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="busBody3d" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="50%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+    <linearGradient id="busRoof3d" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="60%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="glassFront" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#0369a1"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+    <linearGradient id="chromeTrim" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#94a3b8"/>
+      <stop offset="50%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+  </defs>
+  <g class="bus-headlights-beam">
+    <polygon points="35,46 10,0 45,0" fill="url(#headlightGrad)"/>
+    <polygon points="85,46 75,0 110,0" fill="url(#headlightGrad)"/>
+  </g>
+  <g filter="url(#bus3dShadow)">
+    <rect x="23" y="58" width="7" height="22" rx="3.5" fill="#0f172a"/>
+    <rect x="90" y="58" width="7" height="22" rx="3.5" fill="#0f172a"/>
+    <rect x="23" y="120" width="7" height="22" rx="3.5" fill="#0f172a"/>
+    <rect x="90" y="120" width="7" height="22" rx="3.5" fill="#0f172a"/>
+    <path d="M24 52 L17 49 Q15 48 16 46 L21 44 Q23 44 24 47 Z" fill="#1e3a8a"/>
+    <path d="M96 52 L103 49 Q105 48 104 46 L99 44 Q97 44 96 47 Z" fill="#1e3a8a"/>
+    <rect x="17" y="46" width="4" height="2" rx="1" fill="#38bdf8"/>
+    <rect x="99" y="46" width="4" height="2" rx="1" fill="#38bdf8"/>
+    <rect x="26" y="42" width="68" height="114" rx="16" fill="url(#busBody3d)" stroke="#ffffff" stroke-width="1.5"/>
+    <path d="M36 43 Q60 38 84 43" stroke="#1e293b" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M42 46 Q60 43 78 46" stroke="#94a3b8" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <ellipse cx="34" cy="45" rx="5" ry="3.5" fill="#fef08a" stroke="#ffffff" stroke-width="1"/>
+    <ellipse cx="86" cy="45" rx="5" ry="3.5" fill="#fef08a" stroke="#ffffff" stroke-width="1"/>
+    <path d="M33 53 Q60 48 87 53 L84 75 Q60 72 36 75 Z" fill="url(#glassFront)"/>
+    <path d="M45 53 L41 73 L47 73 L51 53 Z" fill="#ffffff" opacity="0.35"/>
+    <rect x="33" y="74" width="54" height="74" rx="8" fill="url(#busRoof3d)" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+    <rect x="42" y="86" width="36" height="26" rx="5" fill="#f8fafc" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="47" y1="92" x2="73" y2="92" stroke="#64748b" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="47" y1="97" x2="73" y2="97" stroke="#64748b" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="47" y1="102" x2="73" y2="102" stroke="#64748b" stroke-width="1.5" stroke-linecap="round"/>
+    <rect x="36" y="118" width="48" height="6" rx="2" fill="#38bdf8" opacity="0.8"/>
+    <rect x="36" y="126" width="48" height="3" rx="1.5" fill="#ffffff" opacity="0.9"/>
+    <path d="M37 148 Q60 151 83 148 L81 144 Q60 146 39 144 Z" fill="#0f172a"/>
+    <rect x="29" y="150" width="7" height="3.5" rx="1.5" fill="#ef4444" stroke="#fca5a5" stroke-width="0.75"/>
+    <rect x="84" y="150" width="7" height="3.5" rx="1.5" fill="#ef4444" stroke="#fca5a5" stroke-width="0.75"/>
+  </g>
+</svg>
+`;
+
 /**
  * Creates custom 3D Bus Marker DivIcon with smooth directional heading,
  * 3D isometric vehicle chassis, and floating status tag.
@@ -33,7 +107,7 @@ function createBusIcon(isMoving, isOffline = false, bearing = 0, speed = 0, busI
         <!-- 2. Rotating 3D Vehicle Chassis (Smoothly turns to match road heading) -->
         <div class="bus-3d-rotator" style="transform: rotate(${roundedBearing}deg);">
           <div class="bus-3d-chassis ${isMoving && !isOffline ? 'bounce-motion' : ''}">
-            <img src="/images/bus-3d.svg" class="bus-3d-img ${isOffline ? 'offline' : ''}" alt="3D Shuttle Bus" />
+            ${BUS_3D_SVG_INLINE}
           </div>
         </div>
 
@@ -262,7 +336,6 @@ export function CampusMap({
       userMarkerRef.current = null;
       stopsLayerGroupRef.current = null;
       routePolylineRef.current = null;
-      historyTrailRef.current = null;
     };
   }, []); // Run ONLY once on mount!
 
@@ -312,22 +385,16 @@ export function CampusMap({
     const map = mapInstanceRef.current;
     if (!map || !busData) return;
 
-    // เมื่อรถ Offline ให้ซ่อนหมุดรถออกจากแผนที่
-    if (isOffline) {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-      }
-      if (busMarkerRef.current && map.hasLayer(busMarkerRef.current)) {
-        map.removeLayer(busMarkerRef.current);
-      }
-      return;
+    // Stop smooth movement animation while offline
+    if (isOffline && animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
     }
 
     const latLng = [busData.latitude, busData.longitude];
     const bearing = busData.bearing ?? 0;
     const speed = busData.speed ?? 0;
     const busId = busData.busId || 'BUS01';
-    const busIcon = createBusIcon(busData.isMoving, false, bearing, speed, busId);
+    const busIcon = createBusIcon(busData.isMoving, isOffline, bearing, speed, busId);
     const timeOnly = busData.recordedAt ? busData.recordedAt.split(' ')[1] || busData.recordedAt : '-';
 
     const popupHtml = `
@@ -349,20 +416,21 @@ export function CampusMap({
       currentContinuousBearingRef.current = bearing;
       targetContinuousBearingRef.current = bearing;
 
-      busMarkerRef.current = L.marker(latLng, { icon: busIcon })
+      busMarkerRef.current = L.marker(latLng, { icon: busIcon, zIndexOffset: 1500 })
         .addTo(map)
         .bindPopup(popupHtml);
 
       prevLatLngRef.current = latLng;
       map.setView(latLng, CONFIG.defaultZoom);
     } else {
+      busMarkerRef.current.setZIndexOffset(1500);
       if (!map.hasLayer(busMarkerRef.current)) {
         busMarkerRef.current.addTo(map);
       }
 
       // Update DOM contents in-place without calling setIcon (prevents tearing down DOM during turns)
       const markerEl = busMarkerRef.current.getElement();
-      if (markerEl) {
+      if (markerEl && markerEl.querySelector('.bus-3d-rotator')) {
         const wrapper = markerEl.querySelector('.bus-3d-wrapper');
         if (wrapper) {
           wrapper.className = `bus-3d-wrapper ${busData.isMoving ? 'is-moving' : 'is-stopped'} ${isOffline ? 'is-offline' : ''}`;
