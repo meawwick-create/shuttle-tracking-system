@@ -27,6 +27,7 @@ export function useBusTracking(busId = 'BUS01') {
   const lastUpdatedDateRef = useRef(null);
 
   // Sliding window of recent positions for stationary drift detection: [{ lat, lng, time }]
+  const recentPositionsRef = useRef([]);
   // Stores the anchor coordinate used to calculate bearing along curves and U-turns
   const lastBearingAnchorRef = useRef(null);
   // Circular history of recent bearings for smoothing micro-jitter during turns
