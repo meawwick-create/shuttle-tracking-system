@@ -48,8 +48,8 @@ export function useEtaCalculator(busLat, busLng, speed = 0, stops = [], isMoving
     const stopsEta = stopsWithDist.map((item, index) => {
       const distRounded = Math.round(item.rawDist);
       let distText;
-      if (distRounded <= 3) {
-        distText = '0 เมตร';
+      if (distRounded <= 15 && isAtStop && index === 0) {
+        distText = '0 ม. (ถึงจุดจอดแล้ว)';
       } else if (distRounded >= 1000) {
         distText = `${(distRounded / 1000).toFixed(2)} กม.`;
       } else {
@@ -60,26 +60,12 @@ export function useEtaCalculator(busLat, busLng, speed = 0, stops = [], isMoving
       const etaMinutes = Math.ceil(etaSeconds / 60);
 
       let etaText;
-      if (isStopped) {
-        // เมื่อรถจอด (ความเร็ว <= 5.0 km/h หรือ isMoving === false)
-        if (distRounded <= 10) {
-          // ระยะห่าง <= 10 เมตร: รถจอดแล้ว/ถึงแล้ว
-          etaText = 'รถจอดแล้ว/ถึงแล้ว';
-        } else if (index === 0) {
-          // ป้ายถัดไปแต่รถจอดห่างเกิน 10 เมตร: รถจอด/ยังไม่ถึง
-          etaText = 'รถจอด/ยังไม่ถึง';
-        } else {
-          etaText = `~ ${etaMinutes} นาที`;
-        }
+      if (index === 0 && isAtStop) {
+        etaText = isStopped ? 'ถึงแล้ว / กำลังจอด' : 'กำลังถึง...';
+      } else if (etaSeconds < 45) {
+        etaText = '< 1 นาที';
       } else {
-        // เมื่อรถกำลังวิ่ง
-        if (index === 0 && isAtStop) {
-          etaText = 'กำลังถึง...';
-        } else if (etaSeconds < 45) {
-          etaText = '< 1 นาที';
-        } else {
-          etaText = `~ ${etaMinutes} นาที`;
-        }
+        etaText = `~ ${etaMinutes} นาที`;
       }
 
       return {
