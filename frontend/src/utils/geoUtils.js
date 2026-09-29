@@ -47,18 +47,6 @@ export function calculateBearing(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Calculates the shortest signed angular difference from currentDeg to targetDeg in range [-180, 180].
- * Correctly handles 0/360 boundary crossings and unwrapped multi-revolution angles.
- * @param {number} currentDeg
- * @param {number} targetDeg
- * @returns {number} delta in degrees (-180 to +180)
- */
-export function getShortestAngleDelta(currentDeg, targetDeg) {
-  const diff = (targetDeg - currentDeg) % 360;
-  return ((diff + 540) % 360) - 180;
-}
-
-/**
  * Validates GPS coordinate numbers.
  * @param {number} lat
  * @param {number} lng

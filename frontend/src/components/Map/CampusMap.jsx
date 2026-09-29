@@ -1,83 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { CONFIG, CAMPUS_STOPS } from '../../config/campusConfig';
-import { projectCoordinates, getShortestAngleDelta } from '../../utils/geoUtils';
+import { projectCoordinates } from '../../utils/geoUtils';
 import { MapControls } from './MapControls';
 import { MapHudOverlay } from './MapHudOverlay';
-
-const BUS_3D_SVG_INLINE = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 180" width="60" height="90" class="bus-3d-img">
-  <defs>
-    <filter id="bus3dShadow" x="-40%" y="-40%" width="180%" height="180%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
-      <feOffset dx="0" dy="8" result="offsetblur"/>
-      <feComponentTransfer>
-        <feFuncA type="linear" slope="0.35"/>
-      </feComponentTransfer>
-      <feMerge> 
-        <feMergeNode/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-    <linearGradient id="headlightGrad" x1="50%" y1="100%" x2="50%" y2="0%">
-      <stop offset="0%" stop-color="#fef08a" stop-opacity="0.6"/>
-      <stop offset="60%" stop-color="#fef9c3" stop-opacity="0.2"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>
-    <linearGradient id="busBody3d" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1d4ed8"/>
-      <stop offset="50%" stop-color="#2563eb"/>
-      <stop offset="100%" stop-color="#1e3a8a"/>
-    </linearGradient>
-    <linearGradient id="busRoof3d" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#3b82f6"/>
-      <stop offset="60%" stop-color="#2563eb"/>
-      <stop offset="100%" stop-color="#1d4ed8"/>
-    </linearGradient>
-    <linearGradient id="glassFront" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="50%" stop-color="#0369a1"/>
-      <stop offset="100%" stop-color="#38bdf8"/>
-    </linearGradient>
-    <linearGradient id="chromeTrim" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#94a3b8"/>
-      <stop offset="50%" stop-color="#f8fafc"/>
-      <stop offset="100%" stop-color="#64748b"/>
-    </linearGradient>
-  </defs>
-  <g class="bus-headlights-beam">
-    <polygon points="35,46 10,0 45,0" fill="url(#headlightGrad)"/>
-    <polygon points="85,46 75,0 110,0" fill="url(#headlightGrad)"/>
-  </g>
-  <g filter="url(#bus3dShadow)">
-    <rect x="23" y="58" width="7" height="22" rx="3.5" fill="#0f172a"/>
-    <rect x="90" y="58" width="7" height="22" rx="3.5" fill="#0f172a"/>
-    <rect x="23" y="120" width="7" height="22" rx="3.5" fill="#0f172a"/>
-    <rect x="90" y="120" width="7" height="22" rx="3.5" fill="#0f172a"/>
-    <path d="M24 52 L17 49 Q15 48 16 46 L21 44 Q23 44 24 47 Z" fill="#1e3a8a"/>
-    <path d="M96 52 L103 49 Q105 48 104 46 L99 44 Q97 44 96 47 Z" fill="#1e3a8a"/>
-    <rect x="17" y="46" width="4" height="2" rx="1" fill="#38bdf8"/>
-    <rect x="99" y="46" width="4" height="2" rx="1" fill="#38bdf8"/>
-    <rect x="26" y="42" width="68" height="114" rx="16" fill="url(#busBody3d)" stroke="#ffffff" stroke-width="1.5"/>
-    <path d="M36 43 Q60 38 84 43" stroke="#1e293b" stroke-width="3" fill="none" stroke-linecap="round"/>
-    <path d="M42 46 Q60 43 78 46" stroke="#94a3b8" stroke-width="2" fill="none" stroke-linecap="round"/>
-    <ellipse cx="34" cy="45" rx="5" ry="3.5" fill="#fef08a" stroke="#ffffff" stroke-width="1"/>
-    <ellipse cx="86" cy="45" rx="5" ry="3.5" fill="#fef08a" stroke="#ffffff" stroke-width="1"/>
-    <path d="M33 53 Q60 48 87 53 L84 75 Q60 72 36 75 Z" fill="url(#glassFront)"/>
-    <path d="M45 53 L41 73 L47 73 L51 53 Z" fill="#ffffff" opacity="0.35"/>
-    <rect x="33" y="74" width="54" height="74" rx="8" fill="url(#busRoof3d)" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
-    <rect x="42" y="86" width="36" height="26" rx="5" fill="#f8fafc" stroke="#94a3b8" stroke-width="1"/>
-    <line x1="47" y1="92" x2="73" y2="92" stroke="#64748b" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="47" y1="97" x2="73" y2="97" stroke="#64748b" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="47" y1="102" x2="73" y2="102" stroke="#64748b" stroke-width="1.5" stroke-linecap="round"/>
-    <rect x="36" y="118" width="48" height="6" rx="2" fill="#38bdf8" opacity="0.8"/>
-    <rect x="36" y="126" width="48" height="3" rx="1.5" fill="#ffffff" opacity="0.9"/>
-    <path d="M37 148 Q60 151 83 148 L81 144 Q60 146 39 144 Z" fill="#0f172a"/>
-    <rect x="29" y="150" width="7" height="3.5" rx="1.5" fill="#ef4444" stroke="#fca5a5" stroke-width="0.75"/>
-    <rect x="84" y="150" width="7" height="3.5" rx="1.5" fill="#ef4444" stroke="#fca5a5" stroke-width="0.75"/>
-  </g>
-</svg>
-`;
 
 /**
  * Creates custom 3D Bus Marker DivIcon with smooth directional heading,
@@ -101,13 +27,13 @@ function createBusIcon(isMoving, isOffline = false, bearing = 0, speed = 0, busI
         <div class="bus-3d-floating-tag">
           <span class="bus-tag-dot ${isOffline ? 'offline' : isMoving ? 'live' : 'idle'}"></span>
           <span class="bus-tag-name">${busId}</span>
-          ${!isOffline && isMoving && roundedSpeed > 0 ? `<span class="bus-tag-speed">${roundedSpeed} km/h</span>` : `<span class="bus-tag-speed" style="display:none">0 km/h</span>`}
+          ${!isOffline && isMoving && roundedSpeed > 0 ? `<span class="bus-tag-speed">${roundedSpeed} km/h</span>` : ''}
         </div>
 
         <!-- 2. Rotating 3D Vehicle Chassis (Smoothly turns to match road heading) -->
         <div class="bus-3d-rotator" style="transform: rotate(${roundedBearing}deg);">
           <div class="bus-3d-chassis ${isMoving && !isOffline ? 'bounce-motion' : ''}">
-            ${BUS_3D_SVG_INLINE}
+            <img src="/images/bus-3d.svg" class="bus-3d-img ${isOffline ? 'offline' : ''}" alt="3D Shuttle Bus" />
           </div>
         </div>
 
@@ -174,9 +100,6 @@ export function CampusMap({
   const animFrameRef = useRef(null);
   const lastUpdateMsRef = useRef(null);
   const lastPanTimeRef = useRef(0);
-  const currentContinuousBearingRef = useRef(null);
-  const targetContinuousBearingRef = useRef(null);
-  const lastAngularVelocityRef = useRef(0);
 
   // Keep callback reference updated without triggering re-init
   const onDragMapRef = useRef(onDragMap);
@@ -336,6 +259,7 @@ export function CampusMap({
       userMarkerRef.current = null;
       stopsLayerGroupRef.current = null;
       routePolylineRef.current = null;
+      historyTrailRef.current = null;
     };
   }, []); // Run ONLY once on mount!
 
@@ -385,16 +309,22 @@ export function CampusMap({
     const map = mapInstanceRef.current;
     if (!map || !busData) return;
 
-    // Stop smooth movement animation while offline
-    if (isOffline && animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
+    // เมื่อรถ Offline ให้ซ่อนหมุดรถออกจากแผนที่
+    if (isOffline) {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+      if (busMarkerRef.current && map.hasLayer(busMarkerRef.current)) {
+        map.removeLayer(busMarkerRef.current);
+      }
+      return;
     }
 
     const latLng = [busData.latitude, busData.longitude];
     const bearing = busData.bearing ?? 0;
     const speed = busData.speed ?? 0;
     const busId = busData.busId || 'BUS01';
-    const busIcon = createBusIcon(busData.isMoving, isOffline, bearing, speed, busId);
+    const busIcon = createBusIcon(busData.isMoving, false, bearing, speed, busId);
     const timeOnly = busData.recordedAt ? busData.recordedAt.split(' ')[1] || busData.recordedAt : '-';
 
     const popupHtml = `
@@ -413,83 +343,22 @@ export function CampusMap({
     `;
 
     if (!busMarkerRef.current) {
-      currentContinuousBearingRef.current = bearing;
-      targetContinuousBearingRef.current = bearing;
-
-      busMarkerRef.current = L.marker(latLng, { icon: busIcon, zIndexOffset: 1500 })
+      busMarkerRef.current = L.marker(latLng, { icon: busIcon })
         .addTo(map)
         .bindPopup(popupHtml);
 
       prevLatLngRef.current = latLng;
       map.setView(latLng, CONFIG.defaultZoom);
     } else {
-      busMarkerRef.current.setZIndexOffset(1500);
       if (!map.hasLayer(busMarkerRef.current)) {
         busMarkerRef.current.addTo(map);
       }
-
-      // Update DOM contents in-place without calling setIcon (prevents tearing down DOM during turns)
-      const markerEl = busMarkerRef.current.getElement();
-      if (markerEl && markerEl.querySelector('.bus-3d-rotator')) {
-        const wrapper = markerEl.querySelector('.bus-3d-wrapper');
-        if (wrapper) {
-          wrapper.className = `bus-3d-wrapper ${busData.isMoving ? 'is-moving' : 'is-stopped'} ${isOffline ? 'is-offline' : ''}`;
-        }
-        const tagDot = markerEl.querySelector('.bus-tag-dot');
-        if (tagDot) {
-          tagDot.className = `bus-tag-dot ${isOffline ? 'offline' : busData.isMoving ? 'live' : 'idle'}`;
-        }
-        const tagName = markerEl.querySelector('.bus-tag-name');
-        if (tagName && tagName.textContent !== busId) {
-          tagName.textContent = busId;
-        }
-        const speedEl = markerEl.querySelector('.bus-tag-speed');
-        const roundedSpeed = Math.round(speed || 0);
-        if (speedEl) {
-          if (!isOffline && busData.isMoving && roundedSpeed > 0) {
-            speedEl.textContent = `${roundedSpeed} km/h`;
-            speedEl.style.display = '';
-          } else {
-            speedEl.style.display = 'none';
-          }
-        }
-        const chassis = markerEl.querySelector('.bus-3d-chassis');
-        if (chassis) {
-          if (busData.isMoving && !isOffline) {
-            chassis.classList.add('bounce-motion');
-          } else {
-            chassis.classList.remove('bounce-motion');
-          }
-        }
-      } else {
-        busMarkerRef.current.setIcon(busIcon);
-      }
-
+      busMarkerRef.current.setIcon(busIcon);
       busMarkerRef.current.setPopupContent(popupHtml);
 
-      // Smooth position and rotation interpolation
-      if (currentContinuousBearingRef.current === null) {
-        currentContinuousBearingRef.current = bearing;
-      }
-      const startBearing = currentContinuousBearingRef.current;
-      let angleDelta = getShortestAngleDelta(startBearing, bearing);
-
-      // In a 180° dead U-turn, follow previous angular turn direction (or default clockwise for Thailand LHT)
-      if (Math.abs(angleDelta) === 180) {
-        angleDelta = lastAngularVelocityRef.current < 0 ? -180 : 180;
-      }
-      if (Math.abs(angleDelta) > 0.1) {
-        lastAngularVelocityRef.current = angleDelta;
-      }
-
-      const endBearing = startBearing + angleDelta;
-      targetContinuousBearingRef.current = endBearing;
-
+      // Smooth position interpolation across consecutive GPS coordinates
       const prev = prevLatLngRef.current;
-      const hasCoordChange = prev && (prev[0] !== latLng[0] || prev[1] !== latLng[1]);
-      const hasBearingChange = Math.abs(angleDelta) > 0.5;
-
-      if (hasCoordChange || hasBearingChange) {
+      if (prev && (prev[0] !== latLng[0] || prev[1] !== latLng[1])) {
         // Start from wherever the marker is RIGHT NOW on screen to avoid jumps
         const currentMarkerPos = busMarkerRef.current.getLatLng();
         const startLat = currentMarkerPos.lat;
@@ -500,6 +369,9 @@ export function CampusMap({
         let targetLng = latLng[1];
 
         // ── High-Speed Dead Reckoning / Latency Compensation ──
+        // When vehicle moves at 40+ km/h (11.1 m/s), network and sensor transit latency (~350ms)
+        // causes the reported coordinate to be physically 3.5 - 5 meters behind reality.
+        // We project the target forward along bearing to keep marker matched with real vehicle.
         if (isHighSpeed && bearing) {
           const speedMps = speed / 3.6;
           const leadDistanceM = Math.min(15, speedMps * 0.35);
@@ -512,10 +384,10 @@ export function CampusMap({
         const interval = lastUpdateMsRef.current ? (now - lastUpdateMsRef.current) : 1000;
         lastUpdateMsRef.current = now;
 
-        // Dynamic duration tailored for smooth motion & turning
+        // Dynamic duration: at high speeds, catch up rapidly (150-320ms) instead of lagging for 1000ms
         const duration = isHighSpeed
           ? Math.min(320, Math.max(120, interval * 0.35))
-          : Math.min(1000, Math.max(250, interval));
+          : Math.min(1200, Math.max(150, interval));
         const startTime = now;
 
         if (animFrameRef.current) {
@@ -532,41 +404,16 @@ export function CampusMap({
 
           if (busMarkerRef.current) {
             busMarkerRef.current.setLatLng([currentLat, currentLng]);
-
-            // Heading: smooth cubic ease-in-out for realistic vehicle steering rotation
-            const turnEase = progress < 0.5
-              ? 2 * progress * progress
-              : -1 + (4 - 2 * progress) * progress;
-            const currentRot = startBearing + (endBearing - startBearing) * turnEase;
-            currentContinuousBearingRef.current = currentRot;
-
-            const el = busMarkerRef.current.getElement();
-            if (el) {
-              const rotator = el.querySelector('.bus-3d-rotator');
-              if (rotator) {
-                rotator.style.transform = `rotate(${currentRot.toFixed(1)}deg)`;
-              }
-            }
           }
 
           if (progress < 1) {
             animFrameRef.current = requestAnimationFrame(animateMarker);
-          } else {
-            currentContinuousBearingRef.current = endBearing;
           }
         };
 
         animFrameRef.current = requestAnimationFrame(animateMarker);
       } else {
         busMarkerRef.current.setLatLng(latLng);
-        currentContinuousBearingRef.current = endBearing;
-        const el = busMarkerRef.current.getElement();
-        if (el) {
-          const rotator = el.querySelector('.bus-3d-rotator');
-          if (rotator) {
-            rotator.style.transform = `rotate(${endBearing.toFixed(1)}deg)`;
-          }
-        }
       }
 
       prevLatLngRef.current = latLng;
