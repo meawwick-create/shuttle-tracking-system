@@ -158,7 +158,8 @@ export function CampusMap({
   isOffline,
   userLocation = null,
   nearestUserStop = null,
-  onLocateUser
+  onLocateUser,
+  busStopStatus = ''
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -415,7 +416,7 @@ export function CampusMap({
         <p><strong>อัปเดตล่าสุด:</strong> ${timeOnly}</p>
         <div>
           <span class="popup-badge ${busData.isMoving ? 'quality-good' : 'quality-weak'}">
-            ${busData.isMoving ? '● กำลังวิ่ง' : '● จอดอยู่'}
+            ${busData.isMoving ? '● กำลังวิ่ง' : `● ${busStopStatus || 'จอดแล้ว'}`}
           </span>
         </div>
       </div>
@@ -510,7 +511,7 @@ export function CampusMap({
         }
       }
     }
-  }, [busData, autoCenter, isOffline]);
+  }, [busData, autoCenter, isOffline, busStopStatus]);
 
   // 6. Handle User Location Marker on Map
   useEffect(() => {

@@ -27,7 +27,8 @@ export function Sidebar({
   requestLocation,
   nearestUserStop,
   userDistanceToStop,
-  userDistText
+  userDistText,
+  busStopStatus
 }) {
   return (
     <aside className="sidebar-panel">
@@ -36,6 +37,7 @@ export function Sidebar({
         timeAgo={timeAgo}
         isOffline={isOffline}
         onCopyCoords={onCopyCoords}
+        busStopStatus={busStopStatus}
       />
 
       <StopsEtaCard

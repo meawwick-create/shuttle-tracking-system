@@ -41,15 +41,14 @@ export function useEtaCalculator(busLat, busLng, speed = 0, stops = [], isMoving
     stopsWithDist.sort((a, b) => a.rawDist - b.rawDist);
 
     const nearest = stopsWithDist[0];
-    const stopRadius = isStopped ? 160 : 125;
-    const isAtStop = nearest.rawDist <= stopRadius;
+    const isAtStopExact = nearest && nearest.rawDist <= 7.0;
 
     // 3. Format per-stop distance and arrival time
     const stopsEta = stopsWithDist.map((item, index) => {
       const distRounded = Math.round(item.rawDist);
       let distText;
-      if (distRounded <= 15 && isAtStop && index === 0) {
-        distText = '0 ม. (ถึงจุดจอดแล้ว)';
+      if (item.rawDist <= 7.0 && index === 0) {
+        distText = '0 ม. (ถึงแล้ว รอรับนักศึกษา)';
       } else if (distRounded >= 1000) {
         distText = `${(distRounded / 1000).toFixed(2)} กม.`;
       } else {
@@ -60,8 +59,12 @@ export function useEtaCalculator(busLat, busLng, speed = 0, stops = [], isMoving
       const etaMinutes = Math.ceil(etaSeconds / 60);
 
       let etaText;
-      if (index === 0 && isAtStop) {
-        etaText = isStopped ? 'ถึงแล้ว / กำลังจอด' : 'กำลังถึง...';
+      if (index === 0) {
+        if (isStopped) {
+          etaText = item.rawDist <= 7.0 ? 'ถึงแล้ว รอรับนักศึกษา' : 'จอดแล้ว';
+        } else {
+          etaText = etaSeconds < 45 ? '< 1 นาที' : `~ ${etaMinutes} นาที`;
+        }
       } else if (etaSeconds < 45) {
         etaText = '< 1 นาที';
       } else {
@@ -77,19 +80,24 @@ export function useEtaCalculator(busLat, busLng, speed = 0, stops = [], isMoving
         etaMinutes,
         etaText,
         isNext:         index === 0,
-        withinRadius:   index === 0 && isAtStop,
+        withinRadius:   index === 0 && item.rawDist <= 7.0,
         isStopped
       };
     });
 
     const nextItem = stopsEta[0];
+    const busStopStatus = isStopped
+      ? (isAtStopExact ? 'ถึงแล้ว รอรับนักศึกษา' : 'จอดแล้ว')
+      : 'กำลังวิ่ง';
 
     return {
-      nearestStop:  nextItem.stop,
-      nextStop:     nextItem.stop,
-      distanceText: nextItem.distanceText,
-      etaText:      nextItem.etaText,
-      stopsEta
+      nearestStop:   nextItem.stop,
+      nextStop:      nextItem.stop,
+      distanceText:  nextItem.distanceText,
+      etaText:       nextItem.etaText,
+      stopsEta,
+      isAtStopExact,
+      busStopStatus
     };
   }, [busLat, busLng, speed, stops, isMoving]);
 }

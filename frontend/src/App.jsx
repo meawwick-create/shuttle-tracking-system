@@ -51,7 +51,7 @@ export function App() {
   const { busData, historyTrail, isOffline, statusMessage } = useBusTracking(selectedBusId);
 
   // 2. ETA & Nearest Stop Calculation Hook
-  const { nearestStop, nextStop, distanceText, etaText, stopsEta } = useEtaCalculator(
+  const { nearestStop, nextStop, distanceText, etaText, stopsEta, busStopStatus } = useEtaCalculator(
     busData?.latitude,
     busData?.longitude,
     busData?.speed,
@@ -209,6 +209,7 @@ export function App() {
           userLocation={userLocation}
           nearestUserStop={nearestUserStop}
           onLocateUser={handleLocateUser}
+          busStopStatus={busStopStatus}
         />
 
         <Sidebar
@@ -232,6 +233,7 @@ export function App() {
           nearestUserStop={nearestUserStop}
           userDistanceToStop={userDistanceToStop}
           userDistText={userDistText}
+          busStopStatus={busStopStatus}
         />
       </main>
 

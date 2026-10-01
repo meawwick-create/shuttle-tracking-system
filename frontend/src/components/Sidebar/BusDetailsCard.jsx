@@ -7,13 +7,15 @@ import React from 'react';
  * @param {string} props.timeAgo
  * @param {Function} props.onCopyCoords
  */
-export function BusDetailsCard({ busData, timeAgo, isOffline, onCopyCoords }) {
+export function BusDetailsCard({ busData, timeAgo, isOffline, onCopyCoords, busStopStatus }) {
   const speed = busData?.speed ?? 0;
   const isMoving = busData?.isMoving ?? false;
   const speedPercent = Math.min(100, Math.max(4, (speed / 60) * 100));
 
   const latText = busData?.latitude ? busData.latitude.toFixed(7) : '-';
   const lngText = busData?.longitude ? busData.longitude.toFixed(7) : '-';
+
+  const stoppedLabel = busStopStatus || 'จอดแล้ว';
 
   return (
     <div className="info-card">
@@ -87,7 +89,7 @@ export function BusDetailsCard({ busData, timeAgo, isOffline, onCopyCoords }) {
                 <circle cx="12" cy="12" r="10"></circle>
                 <polyline points="12 6 12 16 14"></polyline>
               </svg>
-              <span>{isMoving ? 'กำลังวิ่ง' : 'จอดอยู่'}</span>
+              <span>{isMoving ? 'กำลังวิ่ง' : stoppedLabel}</span>
             </>
           )}
         </div>
