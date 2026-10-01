@@ -12,7 +12,7 @@ export const CONFIG = {
 
 // University Sample Bus Stops
 export const CAMPUS_STOPS = [
-  { id: 'STOP01', name: 'งานพัฒนานักศึกษา', lat: 9.098018, lng: 99.356216 },
+  { id: 'STOP01', name: 'งานพัฒนานักศึกษา', lat: 9.098062, lng: 99.356298 },
   { id: 'STOP02', name: 'คณะวิทยาศาสตร์และเทคโนโลยีอุตสาหกรรม', lat: 9.096012, lng: 99.358078 },
   { id: 'STOP03', name: 'อาคารศูนย์การเรียนรู้ (LC)', lat: 9.093786, lng: 99.356516 },
   { id: 'STOP04', name: 'คณะศิลปศาสตร์และวิทยาการจัดการ', lat: 9.094334, lng: 99.357079 },
