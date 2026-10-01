@@ -444,30 +444,29 @@ export function CampusMap({
         const startLat = currentMarkerPos.lat;
         const startLng = currentMarkerPos.lng;
         
-        const isHighSpeed = speed >= 20; // High speed mode (20+ km/h)
+        const isMovingCar = speed >= 5;
         let targetLat = latLng[0];
         let targetLng = latLng[1];
 
-        // ── High-Speed Dead Reckoning / Latency Compensation ──
-        // When vehicle moves at 40+ km/h (11.1 m/s), network and sensor transit latency (~350ms)
-        // causes the reported coordinate to be physically 3.5 - 5 meters behind reality.
-        // We project the target forward along bearing to keep marker matched with real vehicle.
-        if (isHighSpeed && bearing) {
+        // ── Active Dead Reckoning / Latency Compensation ──
+        // Compensates for ~500ms sensor-to-cloud-to-client network latency.
+        // Projects coordinates forward along bearing so the marker matches real-world vehicle position.
+        if (speed >= 8 && bearing) {
           const speedMps = speed / 3.6;
-          const leadDistanceM = Math.min(15, speedMps * 0.35);
+          const leadDistanceM = Math.min(25, speedMps * 0.50);
           const [projectedLat, projectedLng] = projectCoordinates(targetLat, targetLng, bearing, leadDistanceM);
           targetLat = projectedLat;
           targetLng = projectedLng;
         }
 
         const now = performance.now();
-        const interval = lastUpdateMsRef.current ? (now - lastUpdateMsRef.current) : 1000;
+        const interval = lastUpdateMsRef.current ? (now - lastUpdateMsRef.current) : 500;
         lastUpdateMsRef.current = now;
 
-        // Dynamic duration: at high speeds, catch up rapidly (150-320ms) instead of lagging for 1000ms
-        const duration = isHighSpeed
+        // Ultra-responsive animation: catch up within 120-320ms so marker never lags behind
+        const duration = isMovingCar
           ? Math.min(320, Math.max(120, interval * 0.35))
-          : Math.min(1200, Math.max(150, interval));
+          : 250;
         const startTime = now;
 
         if (animFrameRef.current) {
@@ -500,9 +499,9 @@ export function CampusMap({
 
       if (autoCenter) {
         const now = performance.now();
-        const isHighSpeed = speed >= 20;
-        const panInterval = isHighSpeed ? 350 : 600;
-        const panDuration = isHighSpeed ? 0.35 : 0.6;
+        const isHighSpeed = speed >= 15;
+        const panInterval = isHighSpeed ? 250 : 500;
+        const panDuration = isHighSpeed ? 0.25 : 0.5;
 
         // Throttle camera panTo so rapid updates don't thrash Leaflet's camera
         if (now - lastPanTimeRef.current > panInterval) {
