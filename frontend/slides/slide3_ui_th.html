@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1920px; height: 1080px; overflow: hidden;
+    font-family: 'Prompt', sans-serif;
+    background: linear-gradient(135deg, #ffffff 0%, #eef4ff 60%, #dde9ff 100%);
+    position: relative;
+  }
+  .title {
+    position: absolute; left: 70px; top: 40px;
+    display: flex; align-items: center; gap: 20px;
+  }
+  .title img { width: 76px; height: 76px; border-radius: 18px; box-shadow: 0 6px 16px rgba(29,78,216,.3); }
+  .title h1 { font-size: 52px; font-weight: 700; color: #0b1f4d; line-height: 1.1; }
+  .title p { font-size: 22px; color: #475569; margin-top: 4px; }
+
+  .phone {
+    position: absolute; left: 733px; top: 140px;
+    width: 453px; height: 900px;
+    border-radius: 34px; overflow: hidden;
+    box-shadow: 0 0 0 12px #0f172a, 0 30px 60px rgba(15,23,42,.35);
+  }
+  .phone img.screen { width: 453px; height: 900px; display: block; }
+  .cover-badge {
+    position: absolute; left: 76px; top: 838px; width: 360px; height: 36px; background: #ffffff;
+    display: flex; align-items: center; padding-left: 4px;
+    font-size: 15px; font-weight: 600; color: #0b1f4d;
+  }
+  .header-logo { position: absolute; left: 28px; top: 57px; width: 31px; height: 31px; border-radius: 7px; }
+
+  svg.lines { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
+
+  .card {
+    position: absolute; width: 560px;
+    background: #fff; border-radius: 20px;
+    padding: 20px 26px 20px 92px;
+    box-shadow: 0 10px 28px rgba(15,23,42,.10);
+    border: 1px solid #e2e8f0;
+  }
+  .card .num {
+    position: absolute; left: 22px; top: 50%; transform: translateY(-50%);
+    width: 52px; height: 52px; border-radius: 50%;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #fff; font-size: 26px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 10px rgba(29,78,216,.35);
+  }
+  .card h3 { font-size: 28px; font-weight: 600; color: #0b1f4d; line-height: 1.25; }
+  .card p { font-size: 20px; color: #475569; line-height: 1.45; margin-top: 4px; }
+  .pill { display: inline-block; font-size: 16px; font-weight: 500; padding: 2px 12px; border-radius: 999px; margin: 6px 4px 0 0; color: #fff; }
+  .g { background: #16a34a; } .b { background: #2563eb; } .o { background: #f59e0b; } .x { background: #64748b; }
+
+  .left  { left: 70px; }
+  .right { left: 1290px; }
+</style>
+</head>
+<body>
+  <div class="title">
+    <img src="logo.png" alt="logo">
+    <div>
+      <h1>ส่วนประกอบหน้าเว็บและการทำงาน</h1>
+      <p>PSU Shuttle Tracking System · ใช้งานผ่านเว็บบนมือถือได้ทันที ไม่ต้องติดตั้งแอป</p>
+    </div>
+  </div>
+
+  <div class="phone">
+    <img class="screen" src="screen_mobile.png" alt="screen">
+    <img class="header-logo" src="logo.png" alt="">
+    <div class="cover-badge">เลือกรถติดตาม (Vehicle Selection)</div>
+  </div>
+
+  <svg class="lines">
+    <g fill="none" stroke="#1d4ed8" stroke-width="3">
+      <polyline points="630,250 700,250 700,212 757,212" />
+      <polyline points="630,495 690,495 690,344 903,344" />
+      <polyline points="630,740 710,740 710,437 795,437" />
+      <polyline points="1290,375 1220,375 1220,576 1122,576" />
+      <polyline points="1290,635 1245,635 1245,830 1120,830" />
+      <polyline points="1290,895 1245,895 1245,995 1115,995" />
+    </g>
+    <g fill="#1d4ed8" stroke="#fff" stroke-width="3">
+      <circle cx="757" cy="212" r="9" />
+      <circle cx="903" cy="344" r="9" />
+      <circle cx="795" cy="437" r="9" />
+      <circle cx="1122" cy="576" r="9" />
+      <circle cx="1120" cy="830" r="9" />
+      <circle cx="1115" cy="995" r="9" />
+    </g>
+  </svg>
+
+  <div class="card left" style="top:178px">
+    <div class="num">1</div>
+    <h3>แถบเมนูด้านบน</h3>
+    <p>โลโก้ · สลับโหมดมืด/สว่าง · ปุ่มตารางเวลารถ · สถานะ Live Tracking · นาฬิกา</p>
+  </div>
+
+  <div class="card left" style="top:423px">
+    <div class="num">2</div>
+    <h3>แผนที่แบบเรียลไทม์</h3>
+    <p>แสดงตำแหน่งรถและป้ายจอดทั้ง 6 จุด หมุดรถหมุนตามทิศทาง อัปเดตทุก 0.5 วินาที</p>
+  </div>
+
+  <div class="card left" style="top:660px">
+    <div class="num">3</div>
+    <h3>สถานะการเชื่อมต่อ</h3>
+    <p>LIVE = รับข้อมูลจากรถปกติ<br>OFFLINE = ไม่ได้รับข้อมูลเกิน 8 วินาที (ซ่อนหมุดรถ)</p>
+  </div>
+
+  <div class="card right" style="top:285px">
+    <div class="num">4</div>
+    <h3>ข้อมูลรถรับ-ส่ง</h3>
+    <p>บอกสถานะของรถตามความเร็วและระยะห่างจากป้าย</p>
+    <span class="pill g">กำลังวิ่ง</span><span class="pill b">ถึงแล้ว รอรับ (≤ 7 ม.)</span><span class="pill o">จอดแล้ว</span><span class="pill x">ออฟไลน์</span>
+  </div>
+
+  <div class="card right" style="top:558px">
+    <div class="num">5</div>
+    <h3>จุดจอดและเวลาถึง (ETA)</h3>
+    <p>แสดงระยะทางและเวลาที่รถจะถึงแต่ละป้าย ป้ายถัดไปจะถูกไฮไลต์ กดเพื่อดูบนแผนที่ได้</p>
+  </div>
+
+  <div class="card right" style="top:820px">
+    <div class="num">6</div>
+    <h3>เลือกรถที่ต้องการติดตาม</h3>
+    <p>สลับดูรถ BUS01 / BUS02 / BUS03 (รองรับการเพิ่มรถในอนาคต)</p>
+  </div>
+</body>
+</html>
